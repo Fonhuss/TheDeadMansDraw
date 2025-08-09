@@ -119,6 +119,7 @@
         <span class="text-xs text-slate-400 self-center">Rum: <span id="ui-room" class="font-mono">—</span></span>
         <span class="text-xs text-slate-400 self-center">Fase: <span id="ui-phase" class="pill">Lobby</span></span>
         <span class="text-xs text-slate-400 self-center">Turfase: <span id="ui-turn" class="pill">—</span></span>
+        <span class="text-xs text-slate-400 self-center">Realtime: <span id="ui-rt" class="pill">Ikke forbundet</span></span>
       </div>
 
       <div class="mt-3 flex flex-wrap gap-2 items-center">
@@ -289,20 +290,45 @@ async function join(code, asHost){
 
   if(S.useNet){
     if(!S.sb) $('#init').click();
-    S.channel=S.sb.channel(`tavern-${code}`,{config:{broadcast:{self:true},presence:{key:S.me.id}}});
-    S.channel.on('presence',{event:'sync'},()=>{
-      const st=S.channel.presenceState(); const list=Object.values(st).flat().map(p=>p.meta);
-      for(const p of list){ S.presence[p.id]={id:p.id,name:p.name,host:!!p.host}; }
+
+    // --- realtime channel (broadcast + presence) ---
+    S.channel = S.sb.channel(`tavern-${code}`, {
+      config: { broadcast: { self: true }, presence: { key: S.me.id } }
+    });
+
+    // status logs
+    S.channel.on('system', { event: 'join' }, () => log('🔌 Realtime: join'));
+    S.channel.on('system', { event: 'leave' }, () => log('🔌 Realtime: leave'));
+
+    // presence sync => opdatér deltagerliste
+    S.channel.on('presence', { event: 'sync' }, () => {
+      const st = S.channel.presenceState();
+      const list = Object.values(st).flat().map(p => p.meta);
+      for (const p of list) S.presence[p.id] = { id: p.id, name: p.name, host: !!p.host };
       renderAll(); recalcPot();
+      log('👥 Presence sync: ' + list.map(p => p.name).join(', '));
     });
-    S.channel.on('broadcast',{event:'public'},({payload})=> onPublic(payload));
-    S.channel.on('broadcast',{event:'signal'},({payload})=> onSignal(payload));
-    await S.channel.subscribe(async status=>{
-      if(status!=='SUBSCRIBED') return;
-      await S.channel.track({id:S.me.id,name:myName,host:S.isHost});
-      log(`Du er ${myName}${S.isHost?' (host)':''}. Del rumkode: ${S.room}`);
-      if(S.isHost){ publish({t:'info',m:`Sæder: ${activeNames.join(', ')}`}); publish({t:'passTarget',v:S.passTarget}); publish({t:'stake',v:S.stake}); }
-    });
+
+    // broadcasts
+    S.channel.on('broadcast', { event: 'public' }, ({ payload }) => onPublic(payload));
+    S.channel.on('broadcast', { event: 'signal' }, ({ payload }) => onSignal(payload));
+
+    // subscribe (VENT og tjek fejl)
+    const { error: subErr } = await S.channel.subscribe();
+    if (subErr) { console.error(subErr); log('❌ Realtime subscribe fejlede: ' + subErr.message); return; }
+
+    log('✅ Realtime SUBSCRIBED – tracker dig i rummet...');
+    const { error: trackErr } = await S.channel.track({ id: S.me.id, name: myName, host: S.isHost });
+    if (trackErr) { console.error(trackErr); log('❌ Presence track fejlede: ' + trackErr.message); }
+
+    const rt = $('#ui-rt'); if (rt) rt.textContent = 'Tilsluttet';
+
+    // del opsætningsinfo hvis du er host
+    if (S.isHost) {
+      publish({ t: 'info', m: `Sæder: ${activeNames.join(', ')}` });
+      publish({ t: 'passTarget', v: S.passTarget });
+      publish({ t: 'stake', v: S.stake });
+    }
   } else { log('🔌 Offline/solo–mode.'); }
 }
 
@@ -397,6 +423,7 @@ function renderAll(){
     S.turnStage==='chooseGiveBack'?'Vælg dit kort (byttes)':'—'
   );
   potBadge.textContent=String(S.pot); potBadgeSm.textContent=String(S.pot);
+  const rt=$('#ui-rt'); if(rt) rt.textContent = S.channel ? 'Tilsluttet' : 'Ikke forbundet';
   confirmBtn.disabled = !(S.turnStage==='chooseGiveBack' && S.selectedIdx!==null);
 }
 function renderPlayers(){
@@ -662,7 +689,6 @@ function clearBotTimer(){ if(S.botTimer){ clearTimeout(S.botTimer); S.botTimer=n
 function maybeBotTakeTurn(id){
   clearBotTimer();
   if(S.phase!=='round' || !S.bots[id]) return;
-  // Bot spiller KUN når det er bot'ens tur
   S.botTimer = setTimeout(()=>{
     if(S.phase!=='round' || S.seats[S.turnIdx]!==id) return;
     const lives=Array.from(S.alive).filter(x=>x!==id);
