@@ -42,7 +42,7 @@
   /* Vælger-overlay til "giv tilbage" */
   #swap-chooser {
     position:absolute; left:50%; transform:translateX(-50%);
-    bottom:-8px; /* hænger under dit sæde */
+    bottom:-8px;
     background:rgba(15,23,42,.95);
     border:1px solid #334155; border-radius:12px;
     padding:.5rem; display:none; min-width:220px;
@@ -200,8 +200,7 @@ const S = {
   pending:{ targetId:null, oppIdx:null, receivedIndex:null },
 
   selectedIdx:null,
-
-  botTimer:null // så vi kan stoppe bots når det bliver din tur/afsløring
+  botTimer:null
 };
 const DEFAULT_NPCS = ["Barkeep Borin","Sable the Cutpurse","Priestess Kael","Old Man Rook","Garruk the Smith","Nina Nightjar","Sir Thorne","Mina Quickstep","Vex the Bard","Hilda Ember","Karn Ironjaw","Willow Whisper"];
 
@@ -327,7 +326,6 @@ function onPublic(msg){
 }
 
 /* ====== P2P for hemmelige kort ====== */
-import SimplePeer from 'https://esm.sh/simple-peer@9.11.1'; // (alias ikke nødvendig, men beholdes)
 async function ensurePeer(otherId, initiator){
   if(S.peers.has(otherId)) return S.peers.get(otherId);
   const p=new Peer({initiator, trickle:false});
@@ -368,11 +366,11 @@ $('#start-round').onclick=()=>{
   if(alive.length<2) return alert('Kræver mindst 2 spillere. Slå NPC-fyld til eller brug 1p.');
   if(alive.length===2) return publish({t:'final',seed:crypto.randomUUID(),first:alive[rnd(2)]});
 
-  // >>> VIGTIGT: DU STARTER ALTID <<<
+  // Du starter altid
   const order = alive.slice();
   const myIndex = order.indexOf(S.me.id);
   if(myIndex>0){ const [me] = order.splice(myIndex,1); order.unshift(me); }
-  const startIdx = 0; // din plads
+  const startIdx = 0;
 
   publish({t:'startRound',seed:crypto.randomUUID(),order,startIdx});
 };
@@ -450,7 +448,7 @@ function renderTable(){
         row.appendChild(c);
       });
 
-      // overlay-vælger lige under mit sæde i chooseGiveBack
+      // overlay-vælger under mit sæde i chooseGiveBack
       const chooser = document.createElement('div');
       chooser.id='swap-chooser';
       if(S.phase==='round' && S.seats[S.turnIdx]===id && S.turnStage==='chooseGiveBack'){
@@ -478,7 +476,7 @@ function renderTable(){
       seat.appendChild(chooser);
 
     } else {
-      // modstander: 2 “bagsider” – klikvenlige
+      // MODSTANDERE: venstre/højre kort som ét-klik valg
       for(let k=0;k<2;k++){
         const c=document.createElement('button');
         c.type='button';
@@ -487,18 +485,17 @@ function renderTable(){
 
         if(S.phase==='round' && S.seats[S.turnIdx]===S.me.id){
           if(S.turnStage==='chooseTarget'){
+            // ét klik: sæt mål + vælg L/R med det samme
             c.classList.add('me-turn','targetable');
             c.onclick = ()=>{
               if(id===S.me.id) return;
               S.pending.targetId = id;
               S.turnStage = 'chooseOppCard';
-              log(`Vælg ${S.presence[id]?.name||'spiller'}s venstre/højre kort.`);
-              renderAll();
+              chooseOppCardIndex(k);
             };
           } else if(S.turnStage==='chooseOppCard' && S.pending.targetId===id){
+            // fallback hvis mål allerede er valgt
             c.classList.add('me-turn','targetable');
-            c.dataset.side = (k===0?'L':'R');
-            c.title = (k===0?'Tag venstre kort':'Tag højre kort');
             c.onclick = ()=> chooseOppCardIndex(k);
             c.onmouseenter = ()=> c.classList.add('selected');
             c.onmouseleave = ()=> c.classList.remove('selected');
@@ -534,7 +531,7 @@ function startRoundApply(seed, order, startIdx){
       const id=S.seats[i];
       if(id===S.me.id) receiveCard(card);
       else if(S.bots[id]) botReceiveCard(id,card);
-      else sendCardToThief(/*from*/null, id, card); // initial deal til menneske via p2p-path
+      else sendCardToThief(/*from*/null, id, card);
     }
   }
   publish({t:'enableTurn', id:S.seats[S.turnIdx]});
@@ -667,7 +664,7 @@ function maybeBotTakeTurn(id){
   if(S.phase!=='round' || !S.bots[id]) return;
   // Bot spiller KUN når det er bot'ens tur
   S.botTimer = setTimeout(()=>{
-    if(S.phase!=='round' || S.seats[S.turnIdx]!==id) return; // sikkerhedscheck
+    if(S.phase!=='round' || S.seats[S.turnIdx]!==id) return;
     const lives=Array.from(S.alive).filter(x=>x!==id);
     const target = lives[rnd(lives.length)];
     const idx = rnd(2);
