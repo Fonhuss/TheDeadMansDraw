@@ -30,6 +30,15 @@
   .scrollbox{scrollbar-color:#334155 transparent}
   .rules a{color:#93c5fd;text-decoration:underline}
   .pill{display:inline-block;padding:.2rem .5rem;border-radius:9999px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:.75rem}
+
+  /* NYT: gør modstander-kort lette at ramme og tydelige ved hover */
+  .opp-card-hit { cursor: pointer; padding: 4px; }
+  .opp-card-hit.targetable:hover {
+    transform: scale(1.04);
+    box-shadow: 0 0 18px rgba(96,165,250,.45);
+    outline: 2px solid #60a5fa;
+  }
+
   @media (max-width:640px){.circle{width:92vw;height:92vw}.seat{width:30vw;height:30vw}.card{width:10vw;height:14vw}}
 </style>
 </head>
@@ -172,7 +181,7 @@ const S = {
   turnStage:'idle', // 'chooseTarget' | 'chooseOppCard' | 'chooseGiveBack' | 'idle'
   pending:{ targetId:null, oppIdx:null, receivedIndex:null },
 
-  selectedIdx:null // used in chooseGiveBack to pick which of *your original* cards to give back
+  selectedIdx:null
 };
 const DEFAULT_NPCS = ["Barkeep Borin","Sable the Cutpurse","Priestess Kael","Old Man Rook","Garruk the Smith","Nina Nightjar","Sir Thorne","Mina Quickstep","Vex the Bard","Hilda Ember","Karn Ironjaw","Willow Whisper"];
 
@@ -350,7 +359,7 @@ $('#show-hand').onclick=()=>{
 };
 $('#confirm-swap').onclick = confirmGiveBack;
 
-/* ====== Render ====== */
+/* ====== Render (med NY renderTable) ====== */
 function renderAll(){
   renderPlayers();
   renderTable();
@@ -376,55 +385,73 @@ function renderPlayers(){
   });
 }
 function renderTable(){
-  const ids=S.alive.size? Array.from(S.alive):Object.keys(S.presence);
-  table.innerHTML='';
-  const n=ids.length||4; const r=220;
+  const ids = S.alive.size ? Array.from(S.alive) : Object.keys(S.presence);
+  table.innerHTML = '';
+  const n = ids.length || 4; const r = 220;
+
   ids.forEach((id,i)=>{
     const angle=(i/n)*Math.PI*2 - Math.PI/2;
     const x=260+Math.cos(angle)*r, y=260+Math.sin(angle)*r;
     const seat=document.createElement('div'); seat.className='seat'; seat.style.left=x+'px'; seat.style.top=y+'px';
 
-    // Header
-    const isTurn = (S.phase==='round' && S.seats[S.turnIdx]===id);
-    seat.insertAdjacentHTML('afterbegin', `<div class="text-center mb-1 ${isTurn?'text-amber-300':''}">${S.presence[id]?.name||'?'}</div>`);
+    const isTurnSeat = (S.phase==='round' && S.seats[S.turnIdx]===id);
+    seat.insertAdjacentHTML('afterbegin',
+      `<div class="text-center mb-1 ${isTurnSeat?'text-amber-300':''}">${S.presence[id]?.name||'?'}</div>`
+    );
 
-    // Row of two cards (other players as backsides)
-    const row=document.createElement('div'); row.className='flex items-center justify-center gap-2';
+    const row=document.createElement('div'); row.className='flex items-center justify-center gap-3';
 
     if(id===S.me.id){
-      // show my real hand (2 or 3 during swap)
+      // vis præcis mine kort (2–3)
       S.localHand.forEach((card, idx)=>{
         const c=document.createElement('div'); c.className='card';
-        if(card==='life') c.classList.add('life'); if(card==='death') c.classList.add('death');
+        if(card==='life') c.classList.add('life');
+        if(card==='death') c.classList.add('death');
+
+        // i "chooseGiveBack" må jeg kun vælge et af mine oprindelige kort
         if(S.phase==='round' && S.seats[S.turnIdx]===id && S.turnStage==='chooseGiveBack'){
-          // only allow selecting one of your *original* two (not the just-taken one)
           const isForbidden = (S.pending.receivedIndex===idx);
           c.classList.add('me-turn');
           if(S.selectedIdx===idx) c.classList.add('selected');
+          c.title = isForbidden ? 'Du kan ikke give det kort tilbage, du lige tog' : 'Vælg dette kort at give tilbage';
           c.onclick = ()=>{
             if(isForbidden){ alert('Du skal give et af dine oprindelige kort tilbage – ikke det du lige tog.'); return; }
-            S.selectedIdx=idx; renderAll();
+            S.selectedIdx = idx; renderAll();
           };
         }
         row.appendChild(c);
       });
     } else {
-      // opponent seat: backsides, but clickable when selecting target or their card
-      // a wrapper for each backside to click L/R
+      // modstander: 2 "bagsider" – KLIKVENLIGE
       for(let k=0;k<2;k++){
-        const c=document.createElement('div'); c.className='card';
-        // Selecting target?
+        const c=document.createElement('button'); // større hitbox + naturlig fokus
+        c.type='button';
+        c.className='card opp-card-hit';
+        c.title = 'Klik for at vælge';
+
+        // kun klikbar når det er MIN tur
         if(S.phase==='round' && S.seats[S.turnIdx]===S.me.id){
           if(S.turnStage==='chooseTarget'){
+            // først vælger jeg mål
             c.classList.add('me-turn','targetable');
-            c.title = `Vælg ${S.presence[id]?.name||'spiller'}`;
-            c.onclick = ()=> { if(id===S.me.id) return; S.pending.targetId=id; S.turnStage='chooseOppCard'; renderAll(); };
+            c.onclick = ()=>{
+              if(id===S.me.id) return;
+              S.pending.targetId = id;
+              S.turnStage = 'chooseOppCard';
+              log(`Vælg ${S.presence[id]?.name||'spiller'}s venstre/højre kort.`);
+              renderAll();
+            };
           } else if(S.turnStage==='chooseOppCard' && S.pending.targetId===id){
-            c.classList.add('me-turn','selected');
-            c.title = k===0?'Tag venstre kort':'Tag højre kort';
+            // nu vælger jeg venstre/højre
+            c.classList.add('me-turn','targetable');
+            c.dataset.side = (k===0?'L':'R');
+            c.title = (k===0?'Tag venstre kort':'Tag højre kort');
             c.onclick = ()=> chooseOppCardIndex(k);
+            c.onmouseenter = ()=> c.classList.add('selected');
+            c.onmouseleave = ()=> c.classList.remove('selected');
           }
         }
+
         row.appendChild(c);
       }
     }
@@ -454,7 +481,7 @@ function startRoundApply(seed, order, startIdx){
       const id=S.seats[i];
       if(id===S.me.id) receiveCard(card);
       else if(S.bots[id]) botReceiveCard(id,card);
-      else sendCardToThief(/*from*/null, id, card); // initial deal to human via p2p (reuse path)
+      else sendCardToThief(/*from*/null, id, card); // initial deal til menneske via p2p-path
     }
   }
   publish({t:'enableTurn', id:S.seats[S.turnIdx]});
@@ -466,7 +493,7 @@ function receiveCard(card){ S.localHand.push(card); S.hands[S.me.id]=S.localHand
 function botReceiveCard(id, card){ S.hands[id]=(S.hands[id]||[]); S.hands[id].push(card); S.counts[id]=(S.counts[id]||0)+1; }
 
 function thiefReceiveCard(card){
-  // I (thief) received opponent's card: append as new last index, remember index to forbid giving it back
+  // jeg (tyven) modtager modstanderens kort
   const newIdx = S.localHand.length;
   S.localHand.push(card);
   S.pending.receivedIndex = newIdx;
@@ -475,8 +502,8 @@ function thiefReceiveCard(card){
   renderAll();
 }
 function targetReceiveCard(card, targetId){
-  // I (target) received thief's give-back
-  if(targetId!==S.me.id) return; // ignore if routed elsewhere
+  // jeg (mål) modtager tyvens returkort
+  if(targetId!==S.me.id) return;
   S.localHand.push(card);
   renderAll();
 }
@@ -491,7 +518,7 @@ function beginMyTurn(){
 function chooseOppCardIndex(idx){
   if(!(S.turnStage==='chooseOppCard' && S.pending.targetId)) return;
   S.pending.oppIdx = idx;
-  // Ask target to send their card (secret) to me
+  // Bed mål om at sende det valgte kort (hemmeligt) til mig
   publish({t:'askOppCard', thief:S.me.id, target:S.pending.targetId, idx});
   log(`Du vælger ${S.presence[S.pending.targetId]?.name||'?'}s ${idx===0?'venstre':'højre'} kort...`);
 }
@@ -499,23 +526,22 @@ function confirmGiveBack(){
   if(!(S.turnStage==='chooseGiveBack' && S.selectedIdx!==null)) return;
   if(S.selectedIdx===S.pending.receivedIndex){ alert('Du må ikke give det kort tilbage, du lige tog.'); return; }
   const give = S.localHand[S.selectedIdx];
-  // Remove selected give-back from my hand:
+  // fjern valgt returkort fra min hånd
   S.localHand.splice(S.selectedIdx,1);
-  if(S.pending.receivedIndex > S.selectedIdx) S.pending.receivedIndex--; // shift index if needed
-  // Send to target:
+  if(S.pending.receivedIndex > S.selectedIdx) S.pending.receivedIndex--; // justér indeks hvis nødvendigt
+  // send returkortet til mål
   sendCardToTarget(S.me.id, S.pending.targetId, give);
   log(`Du gav et kort tilbage til ${S.presence[S.pending.targetId]?.name||'modstander'}.`);
-  // Turn done
+  // slut tur
   S.turnStage='idle'; S.selectedIdx=null; S.pending={targetId:null,oppIdx:null,receivedIndex:null};
   publish({t:'turnDone'});
   renderAll();
 }
 
-/* ====== Turn flow – events anyone listens to ====== */
-// Target must send its chosen card secretly to thief and remove it from own hand
+/* ====== Turn flow – events ====== */
 function onAskOppCard(thiefId, targetId, idx){
   if(S.bots[targetId]){
-    // bot target: take idx from bot hand
+    // bot som mål
     const h=S.hands[targetId]||[];
     const card=h.splice(idx,1)[0];
     sendCardToThief(targetId, thiefId, card);
@@ -532,18 +558,13 @@ function onAskOppCard(thiefId, targetId, idx){
   publish({t:'gotOppCard', thief:thiefId});
 }
 function onGotOppCard(thiefId){
-  if(thiefId===S.me.id){
-    // my UI will be updated by thiefReceiveCard via p2p already
-  }
+  // tyvens klient får UI-opdatering via p2p (thiefReceiveCard)
 }
 
 /* ====== Advance to next turn & laps ====== */
 function applyTurnAdvance(){
-  // next seat turn
-  const prev=S.turnIdx;
   S.turnIdx=(S.turnIdx+1)%S.seats.length;
 
-  // lap end?
   const lapEnded = (S.turnIdx===S.startIdx);
   if(lapEnded){
     S.passLapCount++;
@@ -592,25 +613,22 @@ function endGame(winner){ S.phase='end'; renderAll(); const name=S.presence[winn
 /* ====== Bots ====== */
 function maybeBotTakeTurn(id){
   if(S.phase!=='round' || !S.bots[id]) return;
-  // Bot plays: choose random live target != id, choose index, then choose give-back (prefer to dump death)
+  // Bot: vælg vilkårlig modstander, venstre/højre, giv evt. death tilbage
   setTimeout(()=>{
     const lives=Array.from(S.alive).filter(x=>x!==id);
     const target = lives[rnd(lives.length)];
     const idx = rnd(2);
-    // take target idx
+    // tag mål-kort
     const thand = S.hands[target]||[];
     const taken = thand.splice(idx,1)[0] || (Math.random()<0.125?'death':'life'); // fallback
-    // give back from its originals (prefer give death if it has)
+    // vælg returkort (prøv at dumpe death)
     const my = S.hands[id]||[];
-    // bot keeps the taken card; must give one original back
-    const originalChoices=my; // my contains only originals at this point
-    let giveIdx = originalChoices.findIndex(c=>c==='death');
+    let giveIdx = my.findIndex(c=>c==='death');
     if(giveIdx<0) giveIdx = 0;
-    const give = originalChoices.splice(giveIdx,1)[0] || 'life';
-    // now bot hand becomes: originals minus one + taken card
-    my.push(taken);
-    S.hands[id]=my;
-    // target receives give
+    const give = my.splice(giveIdx,1)[0] || 'life';
+    // bot beholder taget kort
+    my.push(taken); S.hands[id]=my;
+    // mål modtager retur
     const tgt = S.hands[target]||[]; tgt.push(give); S.hands[target]=tgt;
     log(`🤖 ${S.presence[id]?.name||'NPC'} byttede med ${S.presence[target]?.name||'spiller'}.`);
     publish({t:'turnDone'});
