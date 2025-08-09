@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Traitors‑style (kortspil) – Multiplayer på GitHub Pages</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div class="max-w-4xl mx-auto p-4">
+    <header class="mb-4">
+      <h1 class="text-3xl font-bold">Traitors‑style (kortspil)</h1>
+      <p class="text-slate-300">100% klient-side multiplayer med Supabase Realtime (signaling) + WebRTC (private beskeder). Host på GitHub Pages.</p>
+    </header>
+
+    <!-- Setup -->
+    <section class="mb-6 grid gap-3 sm:grid-cols-2">
+      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+        <h2 class="font-semibold mb-2">1) Konfiguration</h2>
+        <label class="block text-sm mb-1">Supabase URL</label>
+        <input id="sb-url" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700" placeholder="https://YOUR-PROJECT.supabase.co" />
+        <label class="block text-sm mt-3 mb-1">Supabase Anon Key</label>
+        <input id="sb-key" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700" placeholder="ey..." />
+        <button id="init-btn" class="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500">Initialisér</button>
+        <p class="text-xs text-slate-400 mt-2">Gemmer lokalt i din browser.</p>
+      </div>
+
+      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+        <h2 class="font-semibold mb-2">2) Opret eller join rum</h2>
+        <label class="block text-sm mb-1">Dit navn</label>
+        <input id="player-name" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700" placeholder="Navn" />
+        <div class="mt-3 flex gap-2">
+          <button id="create-room" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500">Opret rum (host)</button>
+          <input id="room-code" class="flex-1 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700" placeholder="RUMKODE" />
+          <button id="join-room" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500">Join</button>
+        </div>
+        <p class="text-xs text-slate-400 mt-2">Del rumkoden med dine venner.</p>
+      </div>
+    </section>
+
+    <!-- Lobby / Game -->
+    <section id="app" class="hidden grid gap-3">
+      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm text-slate-400">Rumkode</div>
+            <div class="font-mono text-xl" id="ui-room-code">—</div>
+          </div>
+          <div>
+            <span class="text-sm text-slate-400">Din rolle</span>
+            <span id="ui-role" class="ml-2 inline-flex items-center px-3 py-1 rounded-full bg-slate-800 border border-slate-700">ukendt</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-3">
+        <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 md:col-span-2">
+          <h3 class="font-semibold">Lobby / Spil</h3>
+          <div id="log" class="mt-2 h-56 overflow-auto text-sm bg-slate-950/40 border border-slate-800 rounded-xl p-2"></div>
+
+          <div id="host-panel" class="mt-3 hidden">
+            <h4 class="font-semibold">Værktøjer (Host)</h4>
+            <div class="grid sm:grid-cols-2 gap-2 mt-2">
+              <div class="p-2 rounded-xl bg-slate-950/50 border border-slate-800">
+                <label class="block text-sm">Antal Traitors</label>
+                <input id="traitor-count" type="number" min="1" value="2" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700" />
+                <button id="deal-roles" class="mt-2 w-full px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500">Del kort (hemmeligt)</button>
+                <p class="text-xs text-slate-400 mt-1">Roller deles privat via WebRTC til hver spiller.</p>
+              </div>
+              <div class="p-2 rounded-xl bg-slate-950/50 border border-slate-800">
+                <label class="block text-sm">Fase</label>
+                <div class="flex gap-2 mt-1">
+                  <button data-phase="night" class="phase-btn px-3 py-2 rounded-xl bg-slate-700">Nat</button>
+                  <button data-phase="day" class="phase-btn px-3 py-2 rounded-xl bg-slate-700">Dag</button>
+                  <button data-phase="vote" class="phase-btn px-3 py-2 rounded-xl bg-slate-700">Råd (afstem)</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+          <h3 class="font-semibold">Spillere</h3>
+          <ul id="players" class="mt-2 space-y-1 text-sm"></ul>
+        </div>
+      </div>
+
+      <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+        <h3 class="font-semibold">Handlinger</h3>
+        <div class="flex gap-2 mt-2">
+          <select id="vote-target" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700"></select>
+          <button id="send-vote" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500">Afgiv stemme</button>
+          <button id="reveal-role" class="ml-auto px-4 py-2 rounded-xl bg-slate-700">Vis min rolle (kun lokalt)</button>
+        </div>
+      </div>
+    </section>
+
+    <footer class="mt-8 text-xs text-slate-500">Dette er en fan‑prototype inspireret af social deduction. Ikke officielt tilknyttet tv‑programmet.</footer>
+  </div>
+
+  <script type="module">
+    // --- IMPORTS (via ESM CDNs) ---
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+    import Peer from 'https://esm.sh/simple-peer@9.11.1';
+
+    // --- UTIL ---
+    const $ = (sel) => document.querySelector(sel);
+    const logEl = $('#log');
+    const playersEl = $('#players');
+    const voteSelect = $('#vote-target');
+    const roomCodeEl = $('#ui-room-code');
+    const roleBadge = $('#ui-role');
+
+    const state = {
+      supabase: null,
+      channel: null,
+      room: null,
+      isHost: false,
+      playerId: crypto.randomUUID(),
+      name: '',
+      peers: new Map(), // playerId -> Peer
+      roles: {}, // local cache of roles (only your own is stored persistently in localStorage)
+      phase: 'lobby',
+      votes: {},
+      presence: {},
+    };
+
+    const persist = {
+      save(key, val) { localStorage.setItem(key, JSON.stringify(val)); },
+      load(key, def=null) { try { const v = JSON.parse(localStorage.getItem(key)); return v ?? def; } catch { return def; } }
+    };
+
+    // Restore config
+    $('#sb-url').value = persist.load('sb-url','');
+    $('#sb-key').value = persist.load('sb-key','');
+
+    $('#init-btn').onclick = async () => {
+      const url = $('#sb-url').value.trim();
+      const key = $('#sb-key').value.trim();
+      if (!url || !key) { alert('Udfyld Supabase URL og Anon Key'); return; }
+      persist.save('sb-url', url);
+      persist.save('sb-key', key);
+      state.supabase = createClient(url, key, { realtime: { params: { eventsPerSecond: 5 }}});
+      addLog('✅ Supabase initialiseret.');
+    };
+
+    $('#create-room').onclick = async () => {
+      await ensureSB();
+      const name = ($('#player-name').value || '').trim();
+      if (!name) { alert('Skriv dit navn'); return; }
+      state.name = name;
+      const code = makeRoomCode();
+      await joinRoom(code, true);
+    };
+
+    $('#join-room').onclick = async () => {
+      await ensureSB();
+      const name = ($('#player-name').value || '').trim();
+      const code = ($('#room-code').value || '').trim().toUpperCase();
+      if (!name || !code) { alert('Skriv navn og rumkode'); return; }
+      state.name = name;
+      await joinRoom(code, false);
+    };
+
+    async function ensureSB(){ if (!state.supabase) { alert('Tryk "Initialisér" først.'); throw new Error('no supabase'); } }
+
+    function makeRoomCode(){
+      const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+      let s=''; for(let i=0;i<5;i++) s += chars[Math.floor(Math.random()*chars.length)];
+      return s;
+    }
+
+    function addLog(msg){
+      const time = new Date().toLocaleTimeString();
+      const div = document.createElement('div');
+      div.textContent = `[${time}] ${msg}`;
+      logEl.appendChild(div);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    async function joinRoom(code, asHost){
+      state.room = code;
+      state.isHost = !!asHost;
+      roomCodeEl.textContent = code;
+      $('#app').classList.remove('hidden');
+      if (state.isHost) $('#host-panel').classList.remove('hidden');
+
+      // Realtime channel
+      state.channel = state.supabase.channel(`traitors-${code}`, { config: { broadcast: { self: true }, presence: { key: state.playerId } } });
+
+      // Presence sync
+      state.channel.on('presence', { event: 'sync' }, () => {
+        const current = state.channel.presenceState();
+        const players = Object.values(current).flat().map(p => p.meta);
+        state.presence = {}; players.forEach(p => state.presence[p.playerId]=p);
+        renderPlayers();
+      });
+
+      // Presence events
+      state.channel.on('presence', { event: 'join' }, ({ key, newPresences }) => {
+        newPresences.forEach(p => addLog(`🔹 ${p.meta.name} joined`));
+      });
+      state.channel.on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+        leftPresences.forEach(p => addLog(`🔸 ${p.meta.name} left`));
+      });
+
+      // Broadcast events
+      state.channel.on('broadcast', { event: 'signal' }, async (payload) => {
+        handleSignal(payload.payload);
+      });
+      state.channel.on('broadcast', { event: 'public' }, ({ payload }) => {
+        handlePublic(payload);
+      });
+
+      // Subscribe + set presence
+      await state.channel.subscribe(async (status) => {
+        if (status !== 'SUBSCRIBED') return;
+        await state.channel.track({ playerId: state.playerId, name: state.name, isHost: state.isHost });
+        addLog(`Du er ${state.name}${state.isHost?' (host)':''}.`);
+        setupLocalRole();
+        if (state.isHost) addLog('Del rumkoden med dine venner.');
+      });
+    }
+
+    function setupLocalRole(){
+      const key = `role-${state.room}-${state.playerId}`;
+      const existing = persist.load(key, null);
+      if (existing) {
+        state.roles[state.playerId] = existing;
+        roleBadge.textContent = prettyRole(existing);
+      } else {
+        roleBadge.textContent = 'ukendt';
+      }
+    }
+
+    function prettyRole(r){ return r ? (r === 'traitor' ? 'Traitor' : r === 'faithful' ? 'Trofaste' : r) : 'ukendt'; }
+
+    function renderPlayers(){
+      playersEl.innerHTML = '';
+      voteSelect.innerHTML = '<option value="">— vælg spiller —</option>';
+      const list = Object.values(state.presence).sort((a,b)=> a.name.localeCompare(b.name));
+      list.forEach(p => {
+        const li = document.createElement('li');
+        li.className = 'flex items-center justify-between px-3 py-2 rounded-lg bg-slate-950/50 border border-slate-800';
+        li.innerHTML = `<span>${p.name}${p.isHost?' <span class="text-xs text-amber-400">(host)</span>':''}</span><span class="text-xs text-slate-400">${p.playerId === state.playerId ? 'dig' : ''}</span>`;
+        playersEl.appendChild(li);
+        if (p.playerId !== state.playerId) {
+          const opt = document.createElement('option');
+          opt.value = p.playerId; opt.textContent = p.name; voteSelect.appendChild(opt);
+        }
+      });
+    }
+
+    // ---- Host: deal roles privately via WebRTC ----
+    $('#deal-roles').onclick = async () => {
+      if (!state.isHost) return;
+      const all = Object.values(state.presence).filter(p=>!p.isHost); // exclude host from traitor pool by default
+      const hostIncluded = true; // set true to include host in deal
+      const everyone = hostIncluded ? Object.values(state.presence) : all;
+      if (everyone.length < 3) { alert('Kræver mindst 3 spillere'); return; }
+      const tCount = Math.max(1, Math.min(parseInt($('#traitor-count').value||'2',10), Math.floor(everyone.length/2)));
+
+      // Build deck
+      const deck = Array(tCount).fill('traitor').concat(Array(everyone.length - tCount).fill('faithful'));
+      shuffle(deck);
+
+      // Assign roles
+      const assignments = new Map();
+      everyone.forEach((p, i) => assignments.set(p.playerId, deck[i]));
+
+      addLog(`Kort delt: ${tCount} Traitors, ${everyone.length - tCount} Trofaste.`);
+
+      // Send private roles
+      for (const p of everyone) {
+        const role = assignments.get(p.playerId);
+        if (p.playerId === state.playerId) {
+          // host local
+          persist.save(`role-${state.room}-${state.playerId}`, role);
+          state.roles[state.playerId] = role; roleBadge.textContent = prettyRole(role);
+        } else {
+          // ensure P2P to player
+          await connectTo(p.playerId);
+          const peer = state.peers.get(p.playerId);
+          peer.send(JSON.stringify({ type:'role', role }));
+        }
+      }
+
+      // Announce public that roles are dealt
+      publishPublic({ type:'roles_dealt', count: everyone.length });
+    };
+
+    function shuffle(arr){ for (let i=arr.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } }
+
+    // Phases
+    document.querySelectorAll('.phase-btn').forEach(btn => btn.onclick = () => {
+      if (!state.isHost) return;
+      const phase = btn.dataset.phase;
+      state.phase = phase;
+      publishPublic({ type:'phase', phase });
+    });
+
+    $('#reveal-role').onclick = () => {
+      const r = persist.load(`role-${state.room}-${state.playerId}`, null);
+      alert(`Din rolle: ${prettyRole(r)}`);
+    };
+
+    // Voting (public)
+    $('#send-vote').onclick = () => {
+      const target = voteSelect.value;
+      if (!target) { alert('Vælg en spiller'); return; }
+      publishPublic({ type:'vote', from: state.playerId, target });
+    };
+
+    function handlePublic(msg){
+      if (msg.type === 'phase'){
+        addLog(`Fase: ${msg.phase}`);
+      }
+      if (msg.type === 'roles_dealt'){
+        addLog('Roller er delt ud. Tjek din lokale rolle.');
+      }
+      if (msg.type === 'vote'){
+        const voter = state.presence[msg.from]?.name || 'Ukendt';
+        const targetName = state.presence[msg.target]?.name || 'Ukendt';
+        addLog(`🗳️ ${voter} stemte på ${targetName}`);
+      }
+    }
+
+    function publishPublic(payload){
+      state.channel.send({ type:'broadcast', event:'public', payload });
+    }
+
+    // --- WebRTC signaling via Supabase broadcast ---
+    async function connectTo(otherId){
+      if (state.peers.has(otherId)) return state.peers.get(otherId);
+      const initiator = state.isHost; // host initiates
+      const peer = new Peer({ initiator, trickle: false });
+      state.peers.set(otherId, peer);
+
+      peer.on('signal', (data) => {
+        // send signaling message via Supabase broadcast
+        const m = { from: state.playerId, to: otherId, data };
+        state.channel.send({ type:'broadcast', event:'signal', payload: m });
+      });
+
+      peer.on('connect', () => {
+        addLog(`🔗 P2P forbindelse med ${state.presence[otherId]?.name || otherId}`);
+      });
+
+      peer.on('data', (buf) => {
+        try {
+          const msg = JSON.parse(buf.toString());
+          if (msg.type === 'role'){
+            persist.save(`role-${state.room}-${state.playerId}`, msg.role);
+            state.roles[state.playerId] = msg.role; roleBadge.textContent = prettyRole(msg.role);
+            addLog('🎴 Du har modtaget din rolle (privat).');
+          }
+        } catch(e){ console.warn('peer data parse', e); }
+      });
+
+      peer.on('close', () => { addLog(`🔌 P2P lukket med ${otherId}`); state.peers.delete(otherId); });
+      peer.on('error', (err) => { console.error('peer error', err); });
+
+      // For non-host peers, announce presence to host to receive offer
+      if (!state.isHost){
+        const hello = { from: state.playerId, to: null, data: { type:'hello' } };
+        state.channel.send({ type:'broadcast', event:'signal', payload: hello });
+      }
+
+      return peer;
+    }
+
+    async function handleSignal(msg){
+      const { from, to, data } = msg;
+      // Route: if directed, check target; if broadcast hello, host connects
+      if (data?.type === 'hello' && state.isHost){
+        // ensure peer exists and create offer
+        await connectTo(from);
+      }
+      if (to && to !== state.playerId) return;
+
+      let peer = state.peers.get(from);
+      if (!peer){
+        // Non-initiator creates peer on demand
+        peer = new Peer({ initiator: false, trickle: false });
+        state.peers.set(from, peer);
+
+        peer.on('signal', (dataOut) => {
+          const m = { from: state.playerId, to: from, data: dataOut };
+          state.channel.send({ type:'broadcast', event:'signal', payload: m });
+        });
+        peer.on('connect', () => addLog(`🔗 P2P forbindelse med ${state.presence[from]?.name || from}`));
+        peer.on('data', (buf) => {
+          try { const msg = JSON.parse(buf.toString());
+            if (msg.type === 'role'){
+              persist.save(`role-${state.room}-${state.playerId}`, msg.role);
+              state.roles[state.playerId] = msg.role; roleBadge.textContent = prettyRole(msg.role);
+              addLog('🎴 Du har modtaget din rolle (privat).');
+            }
+          } catch(e){}
+        });
+        peer.on('close', () => { addLog(`🔌 P2P lukket med ${from}`); state.peers.delete(from); });
+        peer.on('error', (err) => console.error('peer error', err));
+      }
+
+      try { peer.signal(data); } catch(e){ console.warn('signal err', e); }
+    }
+  </script>
+</body>
+</html>
