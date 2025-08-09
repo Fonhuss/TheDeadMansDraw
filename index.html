@@ -78,7 +78,7 @@
             <input id="pass-rounds" type="number" min="1" max="10" value="1" class="w-28 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700" />
             <button id="set-pass" class="px-3 py-2 rounded-xl bg-sky-700 hover:bg-sky-600">Gem</button>
           </div>
-          <p class="text-xs text-slate-400 mt-1">Runden afsløres først efter så mange fulde omgang(e).</p>
+          <p class="text-xs text-slate-400 mt-1">Runden afsløres efter så mange fulde omgange.</p>
         </div>
       </div>
 
@@ -96,32 +96,36 @@
         <button id="reveal" class="px-3 py-2 rounded-xl bg-rose-700 hover:bg-rose-600">Afslør & eliminer</button>
         <button id="force-final" class="px-3 py-2 rounded-xl bg-fuchsia-700 hover:bg-fuchsia-600">Tving finale (1v1)</button>
 
-        <!-- NY: intuitiv kortvalg -->
         <button id="confirm-pass" class="ml-auto px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50" disabled>Bekræft valgt kort ➜ venstre</button>
         <button id="show-hand" class="px-3 py-2 rounded-xl bg-slate-700">Se mine kort</button>
       </div>
     </div>
 
-    <!-- Regler-boks -->
+    <!-- Sidepanel: Regler + Log (begge kollapset fra start) -->
     <aside class="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 rules">
       <div class="flex items-center justify-between">
         <h3 class="font-semibold">Regler – “The Dead Man’s Draw”</h3>
-        <button id="toggle-rules" class="text-xs px-2 py-1 rounded-lg bg-slate-800 border border-slate-700">Skjul</button>
+        <button id="toggle-rules" class="text-xs px-2 py-1 rounded-lg bg-slate-800 border border-slate-700">Vis</button>
       </div>
-      <div id="rules-body" class="mt-2 text-xs leading-5 space-y-2">
+      <div id="rules-body" class="hidden mt-2 text-xs leading-5 space-y-2">
         <p><strong>Formål:</strong> Undgå <span class="text-rose-400 font-semibold">Death</span>. Sidste spiller uden Death vinder potten.</p>
         <p><strong>Opsætning:</strong> 8 kort totalt – 1× Death, 7× Life. Hver spiller får 2 kort. Alle lægger indsats i potten.</p>
-        <p><strong>Runde:</strong> Startspiller vælger ét af sine to kort og giver <em>venstre</em>. Turen går rundt bordet. Når en fuld omgang er gennemført, tælles det som <em>1 pass-runde</em>. DM vælger hvor mange pass-runder der spilles (feltet “Pass-runder pr. runde”).</p>
-        <p><strong>Afsløring:</strong> Når det aftalte antal pass-runder er spillet, vender alle deres kort. Spilleren med Death er <em>ude</em>. Potten bliver stående.</p>
-        <p><strong>Finale (1v1):</strong> 8 kort lægges i cirkel med billedsiden ned. Spillerne trækker på skift. Den der trækker Death taber; den anden vinder hele potten.</p>
+        <p><strong>Runde:</strong> Startspiller vælger ét af sine kort og giver <em>venstre</em>. Turen går rundt bordet. Når en fuld omgang er gennemført, tælles det som <em>1 pass-runde</em>. DM sætter hvor mange pass-runder der spilles.</p>
+        <p><strong>Afsløring:</strong> Når antal pass-runder er spillet, vender alle kort. Spilleren med Death er <em>ude</em>. Potten bliver stående.</p>
+        <p><strong>Finale (1v1):</strong> 8 kort i cirkel (nedad). Spillerne trækker på skift. Den der trækker Death taber; den anden vinder potten.</p>
         <p><strong>Taverneregler (valgfrit):</strong> Bluff, side-bets, drikkeregler, magiske variationer.</p>
+      </div>
+
+      <div class="mt-4 flex items-center justify-between">
+        <h3 class="font-semibold">Log</h3>
+        <button id="toggle-log" class="text-xs px-2 py-1 rounded-lg bg-slate-800 border border-slate-700">Vis</button>
+      </div>
+      <div id="log-wrap" class="hidden">
+        <div id="log" class="scrollbox mt-2 h-56 overflow-auto text-xs bg-slate-950/40 border border-slate-800 rounded-xl p-2"></div>
       </div>
 
       <h3 class="font-semibold mt-4">Spillere</h3>
       <ul id="players" class="mt-2 space-y-2 text-sm"></ul>
-
-      <h3 class="font-semibold mt-4">Log</h3>
-      <div id="log" class="scrollbox mt-2 h-56 overflow-auto text-xs bg-slate-950/40 border border-slate-800 rounded-xl p-2"></div>
     </aside>
   </section>
 
@@ -147,7 +151,7 @@ import Peer from 'https://esm.sh/simple-peer@9.11.1';
 
 /* ====== Helpers ====== */
 const $ = s => document.querySelector(s);
-const log = (m)=>{ const d=document.createElement('div'); d.textContent = `[${new Date().toLocaleTimeString()}] ${m}`; $('#log').appendChild(d); $('#log').scrollTop = $('#log').scrollHeight; };
+const log = (m)=>{ const d=document.createElement('div'); d.textContent = `[${new Date().toLocaleTimeString()}] ${m}`; const el=$('#log'); if(el){ el.appendChild(d); el.scrollTop = el.scrollHeight; } };
 const rnd = (n)=>Math.floor(Math.random()*n);
 
 /* ====== State ====== */
@@ -162,11 +166,9 @@ const S = {
   stake:10, pot:0, modePlayers:4,
   bots:{},
 
-  // NY: pass-runder
   passTarget: 1,
   passLapCount: 0,
 
-  // NY: kortvalg
   selectedIdx: null
 };
 const DEFAULT_NPCS = ["Barkeep Borin","Sable the Cutpurse","Priestess Kael","Old Man Rook","Garruk the Smith","Nina Nightjar","Sir Thorne","Mina Quickstep","Vex the Bard","Hilda Ember","Karn Ironjaw","Willow Whisper"];
@@ -179,11 +181,24 @@ tabs.forEach(b=> b.onclick = ()=> setMode(parseInt(b.dataset.p,10)));
 $('#fill-npc').onchange = renderNameInputs;
 $('#use-net').onchange  = e => S.useNet = e.target.checked;
 $('#my-name').oninput   = renderNameInputs;
+
+// Regler: kollaps/udvid
 $('#toggle-rules').onclick = ()=>{
-  const body=$('#rules-body');
-  const btn=$('#toggle-rules');
+  const body=$('#rules-body'); const btn=$('#toggle-rules');
   if(body.classList.contains('hidden')){ body.classList.remove('hidden'); btn.textContent='Skjul'; }
   else { body.classList.add('hidden'); btn.textContent='Vis'; }
+};
+// Log: kollaps/udvid
+const logWrapEl = $('#log-wrap');
+const toggleLogBtn = $('#toggle-log');
+toggleLogBtn.onclick = ()=>{
+  if (logWrapEl.classList.contains('hidden')) {
+    logWrapEl.classList.remove('hidden');
+    toggleLogBtn.textContent = 'Skjul';
+  } else {
+    logWrapEl.classList.add('hidden');
+    toggleLogBtn.textContent = 'Vis';
+  }
 };
 
 function setMode(p){
@@ -226,11 +241,12 @@ $('#set-pass').onclick  = ()=> publish({t:'passTarget', v: Math.max(1, Math.min(
 async function ensureNetIfWanted(){ if(!S.useNet) return; if(!S.sb) $('#init').click(); if(!S.sb) throw new Error('Supabase ikke initialiseret'); }
 function makeRoom(){ const chars='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<5;i++) s+=chars[rnd(chars.length)]; return s; }
 
-/* ====== join – binder sæde 0 til dit ID, laver bots og presence ====== */
+/* ====== join – bind sæde 0 til dit ID, lav bots og presence ====== */
 async function join(code, asHost){
   S.room = code; S.isHost = !!asHost; $('#ui-room').textContent = code;
 
   S.alive = new Set(); S.bots = {}; S.presence = {}; S.localHand=[]; S.selectedIdx=null;
+
   const seatInputs = [...document.querySelectorAll('.seat-name')];
   const inputNames = seatInputs.map((el,i)=> (el.value || el.placeholder || `Sæde ${i+1}`));
   const p = S.modePlayers; const fillNPC = $('#fill-npc').checked;
@@ -347,12 +363,15 @@ $('#force-final').onclick = ()=>{
   if(alive.length!==2) return alert('Finale kræver 2 spillere');
   publish({t:'final', seed:crypto.randomUUID(), first: alive[rnd(2)]});
 };
-$('#show-hand').onclick = ()=> alert('Dine kort: ' + (S.localHand.length? S.localHand.map(c=>c==='death'?'DEATH':'Life').join(' , ') : '(ingen)'));
+$('#show-hand').onclick = ()=>{
+  const label = S.localHand.map(c=> c==='death'?'DEATH':'Life').join(' , ');
+  alert('Dine kort: ' + (label || '(ingen)'));
+};
 
-/* ====== Rendering ====== */
+/* ====== Rendering – viser KUN dine faktiske kort (2 eller 3) ====== */
 function renderPlayers(){
   playersList.innerHTML='';
-  const ids = S.alive.size? Array.from(S.alive) : Object.keys(S.presence);
+  const ids = S.alive.size ? Array.from(S.alive) : Object.keys(S.presence);
   ids.forEach(id=>{
     const li=document.createElement('li');
     const alive=S.alive.has(id);
@@ -369,34 +388,28 @@ function renderPlayers(){
     const x=260+Math.cos(angle)*r, y=260+Math.sin(angle)*r;
     const seat=document.createElement('div'); seat.className='seat'; seat.style.left=x+'px'; seat.style.top=y+'px';
 
-    // to kort per sæde – dine kort kan klikkes i egen tur
-    const c0 = document.createElement('div'); c0.className='card';
-    const c1 = document.createElement('div'); c1.className='card';
+    seat.innerHTML = `<div class="text-center mb-1 ${S.phase==='round' && S.seats[S.turnIdx]===id?'text-amber-300':''}">${S.presence[id]?.name||'?'}</div>`;
+    const row=document.createElement('div'); row.className='flex items-center justify-center gap-2';
 
     if(id===S.me.id){
-      if(S.localHand[0]==='life') c0.classList.add('life');
-      if(S.localHand[0]==='death') c0.classList.add('death');
-      if(S.localHand[1]==='life') c1.classList.add('life');
-      if(S.localHand[1]==='death') c1.classList.add('death');
+      S.localHand.forEach((card, idx)=>{
+        const c = document.createElement('div'); c.className='card';
+        if(card==='life')  c.classList.add('life');
+        if(card==='death') c.classList.add('death');
 
-      // kun klik i egen tur
-      if(S.phase==='round' && S.seats[S.turnIdx]===id){
-        c0.classList.add('me-turn');
-        c1.classList.add('me-turn');
-
-        // markér valgt kort
-        if(S.selectedIdx===0) c0.classList.add('selected');
-        if(S.selectedIdx===1) c1.classList.add('selected');
-
-        c0.onclick = ()=> { S.selectedIdx = 0; $('#confirm-pass').disabled=false; renderPlayers(); };
-        c1.onclick = ()=> { S.selectedIdx = 1; $('#confirm-pass').disabled=false; renderPlayers(); };
-      }
+        if(S.phase==='round' && S.seats[S.turnIdx]===id){
+          c.classList.add('me-turn');
+          if(S.selectedIdx===idx) c.classList.add('selected');
+          c.onclick = ()=>{ S.selectedIdx = idx; $('#confirm-pass').disabled=false; renderPlayers(); };
+        }
+        row.appendChild(c);
+      });
+    } else {
+      const p1=document.createElement('div'); p1.className='card';
+      const p2=document.createElement('div'); p2.className='card';
+      row.appendChild(p1); row.appendChild(p2);
     }
 
-    seat.innerHTML = `<div class="text-center mb-1 ${S.phase==='round' && S.seats[S.turnIdx]===id?'text-amber-300':''}">${S.presence[id]?.name||'?'}</div>`;
-    const row=document.createElement('div');
-    row.className='flex items-center justify-center gap-2';
-    row.appendChild(c0); row.appendChild(c1);
     seat.appendChild(row);
     table.appendChild(seat);
   });
@@ -404,7 +417,6 @@ function renderPlayers(){
   potBadge.textContent=String(S.pot); potBadgeSm.textContent=String(S.pot);
   $('#ui-phase').textContent = ({lobby:'Lobby',round:'Runde',reveal:'Afsløring',final:'Finale',end:'Slut'})[S.phase]||S.phase;
 
-  // Bekræft-knap til pas
   const canConfirm = (S.phase==='round' && S.seats[S.turnIdx]===S.me.id && S.selectedIdx!==null && S.localHand.length);
   $('#confirm-pass').disabled = !canConfirm;
 }
@@ -417,7 +429,6 @@ function startRoundApply(seed, order, startIdx){
   S.seats = order.slice(); S.startIdx=startIdx%S.seats.length; S.turnIdx=S.startIdx;
   S.phase='round'; S.passLapCount=0; S.selectedIdx=null; renderPlayers(); log('🃏 Ny runde.');
 
-  // byg deck: 2 pr spiller, præcis 1 death i alt
   const total = S.seats.length*2;
   const deck = Array(total).fill('life'); deck[rnd(total)]='death';
   S.hands={}; S.counts={}; S.localHand=[];
@@ -439,12 +450,16 @@ function startRoundApply(seed, order, startIdx){
 function receiveCard(card){ S.localHand.push(card); S.hands[S.me.id]=S.localHand; S.counts[S.me.id]=(S.counts[S.me.id]||0)+1; renderPlayers(); }
 function botReceiveCard(id, card){ S.hands[id]=(S.hands[id]||[]); S.hands[id].push(card); S.counts[id]=(S.counts[id]||0)+1; }
 
-/* Nyt: bekræft-knap sender valgt kort til venstre */
+/* Bekræft valgt kort */
 $('#confirm-pass').onclick = ()=> {
   if(!(S.phase==='round' && S.seats[S.turnIdx]===S.me.id)) return;
-  if(S.selectedIdx===null || S.localHand.length===0) return;
-  const idx = Math.min(S.selectedIdx, S.localHand.length-1);
-  const card = S.localHand.splice(idx,1)[0]; S.counts[S.me.id]--; S.selectedIdx=null;
+  if(S.selectedIdx===null || !S.localHand.length) return;
+
+  const idx = Math.max(0, Math.min(S.selectedIdx, S.localHand.length-1));
+  const card = S.localHand.splice(idx,1)[0];
+  S.counts[S.me.id] = Math.max(0, (S.counts[S.me.id]||0)-1);
+  S.selectedIdx = null;
+
   const toIdx = (S.turnIdx+1)%S.seats.length; const to=S.seats[toIdx];
   if(S.bots[to]) botReceiveCard(to,card); else if(to===S.me.id) receiveCard(card); else sendSecret(to,card);
   publish({t:'turn', from:S.seats[S.turnIdx], to});
@@ -459,11 +474,8 @@ function enableTurn(){
 }
 
 function applyTurn(from,to){
-  // næste tur
-  const prevIdx = S.turnIdx;
   S.turnIdx=(S.turnIdx+1)%S.seats.length;
 
-  // Slut på EN omgang? (startspilleren modtager, og turpeger igen på start)
   const lapEnded = (to===S.seats[S.startIdx]) && (S.turnIdx===S.startIdx);
   if(lapEnded){
     S.passLapCount++;
@@ -472,13 +484,11 @@ function applyTurn(from,to){
       S.phase='reveal'; renderPlayers(); log('🔔 Aftalt antal pass-runder nået – klar til afsløring.');
       return;
     }
-    // ny omgang starter – samme startspiller tager tur 1 i næste omgang
     publish({t:'enableTurn', id:S.seats[S.turnIdx]});
   } else {
     publish({t:'enableTurn', id:S.seats[S.turnIdx]});
   }
   renderPlayers();
-  // hvis næste er bot, lad den spille
   maybeBotTakeTurn(S.seats[S.turnIdx]);
 }
 
