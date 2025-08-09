@@ -166,6 +166,7 @@ import Peer from 'https://esm.sh/simple-peer@9.11.1';
 const $ = s => document.querySelector(s);
 const log = (m)=>{ const d=document.createElement('div'); d.textContent = `[${new Date().toLocaleTimeString()}] ${m}`; const el=$('#log'); if(el){ el.appendChild(d); el.scrollTop = el.scrollHeight; } };
 const rnd = (n)=>Math.floor(Math.random()*n);
+const hostId = ()=> Object.keys(S.presence).find(id=>S.presence[id]?.host) || S.seats[0] || null;
 
 /* ====== State ====== */
 const S = {
@@ -175,6 +176,7 @@ const S = {
 
   phase:'lobby',
   seats:[],           // autoritativ sæderækkefølge fra host (array af ids)
+  seatNames:{},       // NY: navn pr. seat-id fra host
   alive:new Set(),
   bots:{},
 
@@ -255,7 +257,7 @@ function isHostOnly(fn){ if(!S.isHost){ alert('Kun værten kan ændre dette.'); 
 async function join(code, asHost){
   S.room=code; S.isHost=!!asHost; $('#ui-room').textContent=code;
   S.alive=new Set(); S.bots={}; S.presence={}; S.localHand=[]; S.selectedIdx=null; S.turnStage='idle'; S.pending={targetId:null,oppIdx:null,receivedIndex:null};
-  S.hands={}; S.counts={}; S.seats=[];
+  S.hands={}; S.counts={}; S.seats=[]; S.seatNames={};
 
   const seatInputs=[...document.querySelectorAll('.seat-name')];
   const inputNames = seatInputs.map((el,i)=> (el.value||el.placeholder||`Sæde ${i+1}`));
@@ -307,10 +309,12 @@ async function join(code, asHost){
     // Host: initial seatmap
     if(S.isHost){
       S.seats=[S.me.id];
+      S.seatNames[S.me.id]=myName;
       for(let i=1;i<activeNames.length;i++){
         const npcId = crypto.randomUUID();
         S.seats.push(npcId);
         S.bots[npcId]={isBot:true,name:activeNames[i]};
+        S.seatNames[npcId]=activeNames[i];
       }
       S.alive = new Set(S.seats);
       publish({t:'config', stake:S.stake, passTarget:S.passTarget});
@@ -323,8 +327,8 @@ async function join(code, asHost){
   } else {
     // Offline/solo
     log('🔌 Offline/solo–mode.');
-    S.seats=[S.me.id];
-    for(let i=1;i<activeNames.length;i++){ const npcId=crypto.randomUUID(); S.seats.push(npcId); S.bots[npcId]={isBot:true,name:activeNames[i]}; }
+    S.seats=[S.me.id]; S.seatNames[S.me.id]=myName;
+    for(let i=1;i<activeNames.length;i++){ const npcId=crypto.randomUUID(); S.seats.push(npcId); S.bots[npcId]={isBot:true,name:activeNames[i]}; S.seatNames[npcId]=activeNames[i]; }
     S.alive = new Set(S.seats);
     S.presence[S.me.id]={id:S.me.id,name:myName,host:true,seatAck:true};
     renderAll();
@@ -345,7 +349,6 @@ function assignMissingSeats(activeNames){
   broadcastSeatmap();
 }
 
-// >>> NY: host sætter spilleren direkte når seatRequest kommer
 function hostSeatPlayer(uid, name){
   S.presence[uid] = S.presence[uid] || { id: uid, name, host:false, seatAck:false };
 
@@ -364,6 +367,7 @@ function hostSeatPlayer(uid, name){
     S.seats[idx] = uid;
   }
 
+  S.seatNames[uid] = name;
   S.alive.add(uid);
   log(`🪑 Placerer ${name} på sæde ${idx+1}.`);
 
@@ -372,9 +376,15 @@ function hostSeatPlayer(uid, name){
 }
 
 function broadcastSeatmap(){
-  publish({t:'seatmap', seats:S.seats, bots: Object.fromEntries(Object.entries(S.bots).map(([id,b])=>[id,{name:b.name}]))});
+  // med navne!
+  publish({
+    t:'seatmap',
+    seats:S.seats,
+    seatNames:S.seatNames,
+    bots: Object.fromEntries(Object.entries(S.bots).map(([id,b])=>[id,{name:b.name}]))
+  });
 
-  // send direkte "du sidder på index X" til hver menneske-klient
+  // direkte "du sidder på index X" til hver menneske-klient
   if(S.useNet){
     for(const id of S.seats){
       if(S.presence[id]){ // menneske
@@ -385,7 +395,7 @@ function broadcastSeatmap(){
   }
   renderAll();
 
-  // Ack-loop: host genudsender seatmap indtil alle har kvitteret
+  // Ack-loop
   if (S.isHost) {
     let tries = 0;
     const ackTimer = setInterval(() => {
@@ -394,7 +404,10 @@ function broadcastSeatmap(){
       const missing = humans.filter(id => !S.presence[id]?.seatAck);
       if (missing.length === 0 || tries > 10) { clearInterval(ackTimer); return; }
       log('↻ Venter på seat-ack fra: ' + missing.map(id => S.presence[id]?.name || id).join(', '));
-      publish({t:'seatmap', seats:S.seats, bots: Object.fromEntries(Object.entries(S.bots).map(([id,b])=>[id,{name:b.name}]))});
+      publish({
+        t:'seatmap', seats:S.seats, seatNames:S.seatNames,
+        bots: Object.fromEntries(Object.entries(S.bots).map(([id,b])=>[id,{name:b.name}]))
+      });
       for(const id of missing){
         const idx = S.seats.indexOf(id);
         S.channel.send({type:'broadcast', event:'signal', payload:{ from:S.me.id, to:id, data:{ type:'seatAssign', index: idx } }});
@@ -408,10 +421,14 @@ function publish(payload){ if(S.useNet) S.channel.send({type:'broadcast',event:'
 function onPublic(msg){
   if(msg.t==='config'){ if(typeof msg.stake==='number') S.stake=msg.stake; if(typeof msg.passTarget==='number') S.passTarget=msg.passTarget; $('#stake').value=S.stake; $('#pass-rounds').value=S.passTarget; recalcPot(); }
 
-  // >>> ændret: brug hostSeatPlayer, ikke kun assignMissingSeats
   if(msg.t==='seatRequest' && S.isHost){ hostSeatPlayer(msg.id, msg.name||'spiller'); }
 
-  if(msg.t==='seatmap'){ S.seats = msg.seats.slice(); S.bots={}; for(const [id,b] of Object.entries(msg.bots||{})){ S.bots[id]={isBot:true,name:b.name}; } S.alive = new Set(S.seats); renderAll(); recalcPot(); }
+  if(msg.t==='seatmap'){
+    S.seats = msg.seats.slice();
+    S.seatNames = Object.assign({}, msg.seatNames||{});
+    S.bots={}; for(const [id,b] of Object.entries(msg.bots||{})){ S.bots[id]={isBot:true,name:b.name}; }
+    S.alive = new Set(S.seats); renderAll(); recalcPot();
+  }
 
   if(msg.t==='stake'){ if(S.isHost){ publish({t:'config', stake:msg.v}); } S.stake=msg.v; recalcPot(); log(`Indsats: ${S.stake} guld`); }
   if(msg.t==='passTarget'){ if(S.isHost){ publish({t:'config', passTarget:msg.v}); } S.passTarget=Math.max(1,Math.min(10,msg.v|0)); $('#pass-rounds').value=S.passTarget; log(`Pass-runder pr. runde: ${S.passTarget}`); }
@@ -437,40 +454,41 @@ function onPublic(msg){
 function onSignal({from,to,data}){
   if(!S.useNet) return;
 
-  // DM payloads: direkte kort / seatAssign / seatAck
+  // seatAssign → klient sender ACK direkte til host
   if (to===S.me.id && data?.type==='seatAssign') {
     const idx = data.index;
-    if (S.useNet && S.channel) {
-      S.channel.send({ type:'broadcast', event:'signal', payload:{ from:S.me.id, to:null, data:{ type:'seatAck', who:S.me.id, index:idx } }});
+    const hid = hostId();
+    if (hid && S.channel) {
+      S.channel.send({ type:'broadcast', event:'signal',
+        payload:{ from:S.me.id, to:hid, data:{ type:'seatAck', who:S.me.id, index:idx } }
+      });
     }
     log(`🪑 Du er placeret på sæde ${idx+1}.`);
     return;
   }
-  if (to===S.me.id && data?.type==='seatAck') {
-    if (S.isHost && S.presence[data.who]) S.presence[data.who].seatAck = true;
-    return;
-  }
-  if (to===S.me.id && data?.type==='cardToThief') {
-    log('📬 Modtog kort (DM fallback) → thief');
-    thiefReceiveCard(data.card);
-    return;
-  }
-  if (to===S.me.id && data?.type==='cardToTarget') {
-    log('📬 Modtog kort (DM fallback) → target');
-    targetReceiveCard(data.card, data.target);
+
+  // seatAck (host modtager – uanset 'to'-match)
+  if (data?.type==='seatAck') {
+    if (S.isHost && S.presence[data.who]) {
+      S.presence[data.who].seatAck = true;
+      log(`✅ Seat-ack fra ${S.presence[data.who].name||data.who}.`);
+    }
     return;
   }
 
-  // WebRTC signaler (for P2P)
-  if(to && to!==S.me.id) return; // ikke til mig
+  // DM-kort
+  if (to===S.me.id && data?.type==='cardToThief') { log('📬 Modtog kort (DM fallback) → thief'); thiefReceiveCard(data.card); return; }
+  if (to===S.me.id && data?.type==='cardToTarget'){ log('📬 Modtog kort (DM fallback) → target'); targetReceiveCard(data.card, data.target); return; }
+
+  // WebRTC signaler (P2P)
+  if(to && to!==S.me.id) return;
   let p=S.peers.get(from);
-  const shouldInitiate = !p && (S.isHost || S.me.id < from); // deterministisk initiator
+  const shouldInitiate = !p && (S.isHost || S.me.id < from);
   if(!p){
     p = new Peer({ initiator: shouldInitiate, trickle:false });
     p.on('signal',d=> S.channel.send({type:'broadcast',event:'signal',payload:{from:S.me.id,to:from,data:d}}));
     p.on('data',buf=>{
-      try{
-        const m=JSON.parse(buf.toString());
+      try{ const m=JSON.parse(buf.toString());
         if(m.t==='cardToThief') thiefReceiveCard(m.card);
         if(m.t==='cardToTarget') targetReceiveCard(m.card, m.target);
       }catch(e){}
@@ -489,7 +507,6 @@ async function ensurePeer(otherId, initiator){
   S.peers.set(otherId,p);
   return p;
 }
-// SEND kort: P2P hvis muligt, ellers DM via Realtime
 async function sendCardToThief(thiefId, card){
   if(S.useNet){
     const p = await ensurePeer(thiefId, S.isHost || S.me.id<thiefId);
@@ -517,9 +534,8 @@ $('#start-round').onclick=()=>{
   if(alive.length<2) return alert('Kræver mindst 2 spillere. Fyld op med NPC’er eller spil 1p.');
   if(alive.length===2){ publish({t:'final', first:alive[rnd(2)]}); return; }
 
-  // Host vælger rækkefølge = sæderækkefølge, start ved host (index 0)
-  const order = S.seats.slice();
-  const startIdx = 0;
+  const order = S.seats.slice(); // sæderækkefølge
+  const startIdx = 0;            // host starter
   publish({t:'startRound', order, startIdx, dealer:S.me.id});
 };
 $('#reveal').onclick = ()=> isHostOnly(()=> publish({t:'reveal'}));
@@ -554,13 +570,16 @@ function renderAll(){
 
   confirmBtn.disabled = !(S.turnStage==='chooseGiveBack' && S.selectedIdx!==null);
 }
+function nameOf(id){
+  return S.presence[id]?.name || S.seatNames[id] || S.bots[id]?.name || 'NPC';
+}
 function renderPlayers(){
   playersList.innerHTML='';
   const ids=S.seats.length? S.seats : Object.keys(S.presence);
   ids.forEach(id=>{
     const li=document.createElement('li');
     const alive=S.alive.has(id);
-    const name = S.presence[id]?.name || S.bots[id]?.name || 'NPC';
+    const name = nameOf(id);
     li.className='flex items-center justify-between px-3 py-2 rounded-lg bg-slate-950/50 border border-slate-800';
     li.innerHTML=`<span>${name}${S.presence[id]?.host?' <span class="text-amber-400 text-xs">(host)</span>':''}${S.bots[id]?' <span class="text-xs text-fuchsia-400">(NPC)</span>':''}</span>
                   <span class="text-xs ${alive?'text-emerald-400':'text-rose-400'}">${alive?'i spil':'ude'}</span>`;
@@ -578,8 +597,8 @@ function renderTable(){
     const seat=document.createElement('div'); seat.className='seat'; seat.style.left=x+'px'; seat.style.top=y+'px';
 
     const isTurnSeat = (S.phase==='round' && S.seats[S.turnIdx]===id);
-    const name = S.presence[id]?.name || S.bots[id]?.name || 'NPC';
-    seat.insertAdjacentHTML('afterbegin', `<div class="text-center mb-1 ${isTurnSeat?'text-amber-300':''}">${name}</div>`);
+    const nm = nameOf(id);
+    seat.insertAdjacentHTML('afterbegin', `<div class="text-center mb-1 ${isTurnSeat?'text-amber-300':''}">${nm}</div>`);
 
     const row=document.createElement('div'); row.className='flex items-center justify-center gap-3';
 
@@ -739,7 +758,6 @@ function confirmGiveBack(){
   publish({t:'turnDone'});
   renderAll();
 }
-function nameOf(id){ return (S.presence[id]?.name || S.bots[id]?.name || 'spiller'); }
 
 /* ====== Events ====== */
 function onAskOppCard(thiefId, targetId, idx){
