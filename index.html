@@ -340,20 +340,37 @@ function assignMissingSeats(activeNames){
   if(!unknown.length) return;
 
   for(const uid of unknown){
-    let idx = S.seats.findIndex((sid, i)=> i>0 && S.bots[sid]);
-    if(idx === -1){
-      if(S.seats.length<4){ idx = S.seats.length; S.seats.push(uid); }
-      else { log(`⚠️ Ingen ledig plads til ${S.presence[uid]?.name||uid}`); continue; }
-    } else {
-      const botId = S.seats[idx];
-      delete S.bots[botId];
-      S.seats[idx] = uid;
-    }
-    S.alive.add(uid);
-    log(`🪑 Placerer ${S.presence[uid]?.name||'spiller'} på sæde ${idx+1}.`);
+    hostSeatPlayer(uid, S.presence[uid]?.name || 'spiller');
   }
   broadcastSeatmap();
 }
+
+// >>> NY: host sætter spilleren direkte når seatRequest kommer
+function hostSeatPlayer(uid, name){
+  S.presence[uid] = S.presence[uid] || { id: uid, name, host:false, seatAck:false };
+
+  let idx = S.seats.findIndex((sid, i)=> i>0 && S.bots[sid]); // undgå host-pladsen (i=0)
+  if (idx === -1) {
+    if (S.seats.length < 4) {
+      idx = S.seats.length;
+      S.seats.push(uid);
+    } else {
+      log(`⚠️ Ingen ledig plads til ${name}.`);
+      return;
+    }
+  } else {
+    const botId = S.seats[idx];
+    delete S.bots[botId];
+    S.seats[idx] = uid;
+  }
+
+  S.alive.add(uid);
+  log(`🪑 Placerer ${name} på sæde ${idx+1}.`);
+
+  publish({ t:'config', stake:S.stake, passTarget:S.passTarget });
+  broadcastSeatmap();
+}
+
 function broadcastSeatmap(){
   publish({t:'seatmap', seats:S.seats, bots: Object.fromEntries(Object.entries(S.bots).map(([id,b])=>[id,{name:b.name}]))});
 
@@ -390,7 +407,10 @@ function broadcastSeatmap(){
 function publish(payload){ if(S.useNet) S.channel.send({type:'broadcast',event:'public',payload}); else onPublic(payload); }
 function onPublic(msg){
   if(msg.t==='config'){ if(typeof msg.stake==='number') S.stake=msg.stake; if(typeof msg.passTarget==='number') S.passTarget=msg.passTarget; $('#stake').value=S.stake; $('#pass-rounds').value=S.passTarget; recalcPot(); }
-  if(msg.t==='seatRequest' && S.isHost){ assignMissingSeats(); }
+
+  // >>> ændret: brug hostSeatPlayer, ikke kun assignMissingSeats
+  if(msg.t==='seatRequest' && S.isHost){ hostSeatPlayer(msg.id, msg.name||'spiller'); }
+
   if(msg.t==='seatmap'){ S.seats = msg.seats.slice(); S.bots={}; for(const [id,b] of Object.entries(msg.bots||{})){ S.bots[id]={isBot:true,name:b.name}; } S.alive = new Set(S.seats); renderAll(); recalcPot(); }
 
   if(msg.t==='stake'){ if(S.isHost){ publish({t:'config', stake:msg.v}); } S.stake=msg.v; recalcPot(); log(`Indsats: ${S.stake} guld`); }
@@ -626,7 +646,6 @@ function renderTable(){
               if(id===S.me.id) return;
               S.pending.targetId = id;
               S.turnStage = 'chooseOppCard';
-              // lille micro-tick så click ikke sluges ved state-skift
               setTimeout(()=> chooseOppCardIndex(k), 0);
             };
           } else if(S.turnStage==='chooseOppCard' && S.pending.targetId===id){
