@@ -1,474 +1,553 @@
 <!doctype html>
 <html lang="da">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>The Dead Man’s Draw – D&D Tavern (1–4p + NPCs)</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    .tavern{background:
-      radial-gradient(1200px 600px at 50% 20%,rgba(255,220,160,.08),transparent),
-      radial-gradient(600px 300px at 10% 10%,rgba(255,255,255,.05),transparent),
-      #0b0f17;min-height:100vh}
-    .wood{background:
-      radial-gradient(closest-side,rgba(0,0,0,.2),rgba(0,0,0,.5)),
-      repeating-conic-gradient(from 0deg,#5d3a1a 0 10deg,#6f4621 10deg 20deg);
-      border:8px solid #3d2a13;box-shadow:0 0 40px rgba(0,0,0,.6) inset,0 10px 30px rgba(0,0,0,.6)}
-    .circle{position:relative;width:520px;height:520px;border-radius:50%;margin:0 auto}
-    .seat{position:absolute;width:120px;height:120px;transform:translate(-50%,-50%)}
-    .card{width:44px;height:64px;border-radius:6px;border:2px solid rgba(0,0,0,.6);
-      box-shadow:0 2px 8px rgba(0,0,0,.5);background:linear-gradient(135deg,#222,#333)}
-    .life{background:linear-gradient(135deg,#164e63,#0e7490)!important}
-    .death{background:linear-gradient(135deg,#3f1d1d,#7f1d1d)!important}
-    .token{width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#ffe38a,#b88700);
-      border:2px solid #4a3406;box-shadow:0 1px 6px rgba(0,0,0,.6);display:inline-flex;align-items:center;justify-content:center;
-      font-weight:700;font-size:12px;color:#3a2a02}
-    .scrollbox{scrollbar-color:#334155 transparent}
-    @media (max-width:640px){.circle{width:92vw;height:92vw}.seat{width:28vw;height:28vw}}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>The Dead Man’s Draw – D&D Tavern (1–4p + NPCs)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  .tavern{background:
+    radial-gradient(1200px 600px at 50% 20%,rgba(255,220,160,.08),transparent),
+    radial-gradient(600px 300px at 10% 10%,rgba(255,255,255,.05),transparent),
+    #0b0f17;min-height:100vh}
+  .wood{background:
+    radial-gradient(closest-side,rgba(0,0,0,.2),rgba(0,0,0,.5)),
+    repeating-conic-gradient(from 0deg,#5d3a1a 0 10deg,#6f4621 10deg 20deg);
+    border:8px solid #3d2a13;box-shadow:0 0 40px rgba(0,0,0,.6) inset,0 10px 30px rgba(0,0,0,.6)}
+  .circle{position:relative;width:520px;height:520px;border-radius:50%;margin:0 auto}
+  .seat{position:absolute;width:120px;height:120px;transform:translate(-50%,-50%)}
+  .card{width:48px;height:70px;border-radius:8px;border:2px solid rgba(0,0,0,.6);
+    box-shadow:0 2px 8px rgba(0,0,0,.5);background:linear-gradient(135deg,#222,#333);
+    transition:transform .12s ease, box-shadow .12s ease, outline .12s ease; cursor:default}
+  .card.me-turn{cursor:pointer}
+  .life{background:linear-gradient(135deg,#164e63,#0e7490)!important}
+  .death{background:linear-gradient(135deg,#3f1d1d,#7f1d1d)!important}
+  .selected{outline:3px solid #fbbf24; box-shadow:0 0 18px rgba(251,191,36,.55)}
+  .token{width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#ffe38a,#b88700);
+    border:2px solid #4a3406;box-shadow:0 1px 6px rgba(0,0,0,.6);display:inline-flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:12px;color:#3a2a02}
+  .scrollbox{scrollbar-color:#334155 transparent}
+  .rules a{color:#93c5fd;text-decoration:underline}
+  @media (max-width:640px){.circle{width:92vw;height:92vw}.seat{width:28vw;height:28vw}.card{width:10vw;height:14vw}}
+</style>
 </head>
 <body class="tavern text-slate-100">
-  <div class="max-w-6xl mx-auto p-4 md:p-6">
-    <header class="mb-4 md:mb-6 flex items-center justify-between gap-3">
-      <div>
-        <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight">The Dead Man’s Draw <span class="text-amber-400">– D&D Tavern</span></h1>
-        <p class="text-slate-300 text-sm md:text-base">1–4 spillere, NPC-bots, potte, online/lokalt. Undgå <span class="text-rose-400 font-semibold">Death</span>.</p>
-      </div>
-      <div class="hidden sm:flex items-center gap-3">
-        <div class="token" id="pot-badge">0</div><span class="text-xs text-slate-400">guld i potten</span>
-      </div>
-    </header>
+<div class="max-w-7xl mx-auto p-4 md:p-6">
+  <header class="mb-4 md:mb-6 flex items-center justify-between gap-3">
+    <div>
+      <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight">The Dead Man’s Draw <span class="text-amber-400">– D&D Tavern</span></h1>
+      <p class="text-slate-300 text-sm md:text-base">1–4 spillere, NPC-bots, potte, online/lokalt. Undgå <span class="text-rose-400 font-semibold">Death</span>.</p>
+    </div>
+    <div class="hidden sm:flex items-center gap-3">
+      <div class="token" id="pot-badge">0</div><span class="text-xs text-slate-400">guld i potten</span>
+    </div>
+  </header>
 
-    <section class="grid lg:grid-cols-3 gap-4 mb-5">
-      <div class="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-        <h2 class="font-semibold mb-2">Spilopsætning</h2>
+  <section class="grid xl:grid-cols-4 gap-4 mb-5">
+    <!-- Opsætning -->
+    <div class="xl:col-span-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+      <h2 class="font-semibold mb-2">Spilopsætning</h2>
 
-        <div class="flex flex-wrap gap-2 items-center mb-3">
-          <span class="text-sm text-slate-300">Spillere:</span>
-          <button class="tab px-3 py-1 rounded-lg bg-slate-800 border border-slate-700" data-p="1">1p</button>
-          <button class="tab px-3 py-1 rounded-lg bg-slate-800 border border-slate-700" data-p="2">2p</button>
-          <button class="tab px-3 py-1 rounded-lg bg-slate-800 border border-slate-700" data-p="3">3p</button>
-          <button class="tab px-3 py-1 rounded-lg bg-slate-800 border border-slate-700" data-p="4">4p</button>
-          <label class="ml-2 text-xs flex items-center gap-2"><input id="fill-npc" type="checkbox" class="accent-amber-500"> Fyld tomme sæder med NPC’er</label>
-          <label class="ml-2 text-xs flex items-center gap-2"><input id="use-net" type="checkbox" class="accent-emerald-500" checked> Online (Supabase)</label>
+      <div class="flex flex-wrap gap-2 items-center mb-3">
+        <span class="text-sm text-slate-300">Spillere:</span>
+        <button class="tab px-3 py-1 rounded-lg bg-slate-800 border border-slate-700" data-p="1">1p</button>
+        <button class="tab px-3 py-1 rounded-lg bg-slate-800 border border-slate-700" data-p="2">2p</button>
+        <button class="tab px-3 py-1 rounded-lg bg-slate-800 border border-slate-700" data-p="3">3p</button>
+        <button class="tab px-3 py-1 rounded-lg bg-slate-800 border border-slate-700" data-p="4">4p</button>
+        <label class="ml-2 text-xs flex items-center gap-2"><input id="fill-npc" type="checkbox" class="accent-amber-500"> Fyld tomme sæder med NPC’er</label>
+        <label class="ml-2 text-xs flex items-center gap-2"><input id="use-net" type="checkbox" class="accent-emerald-500" checked> Online (Supabase)</label>
+      </div>
+
+      <div id="names" class="grid sm:grid-cols-2 md:grid-cols-4 gap-2 mb-2"></div>
+
+      <div class="grid md:grid-cols-3 gap-2">
+        <div>
+          <label class="text-sm">Dit navn</label>
+          <input id="my-name" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700" placeholder="DM/Spiller" />
         </div>
-
-        <div id="names" class="grid sm:grid-cols-2 md:grid-cols-4 gap-2 mb-2"></div>
-
-        <div class="grid sm:grid-cols-2 gap-2">
-          <div>
-            <label class="text-sm">Dit navn</label>
-            <input id="my-name" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700" placeholder="DM/Spiller" />
-          </div>
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="text-sm">Indsats pr. spiller</label>
-              <input id="stake" type="number" min="0" value="10" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700" />
-            </div>
-            <div class="flex items-end">
-              <button id="set-stake" class="w-full px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-500">Sæt</button>
-            </div>
+        <div>
+          <label class="text-sm">Indsats pr. spiller</label>
+          <div class="flex gap-2">
+            <input id="stake" type="number" min="0" value="10" class="w-28 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700" />
+            <button id="set-stake" class="px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-500">Sæt</button>
           </div>
         </div>
-
-        <div class="mt-3 flex flex-wrap gap-2">
-          <button id="init" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500">Initialisér</button>
-          <button id="make" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500">Opret rum</button>
-          <input id="room" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700" placeholder="RUMKODE" />
-          <button id="join" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500">Join</button>
-          <span class="text-xs text-slate-400 self-center">Rum: <span id="ui-room" class="font-mono">—</span></span>
-        </div>
-
-        <div class="mt-3 text-sm">
-          Fase: <span id="ui-phase" class="px-2 py-1 rounded-full bg-slate-800 border border-slate-700">Lobby</span>
-        </div>
-
-        <div class="mt-3 flex flex-wrap gap-2">
-          <button id="start-round" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500">Start runde</button>
-          <button id="reveal" class="px-3 py-2 rounded-xl bg-rose-700 hover:bg-rose-600">Afslør & eliminer</button>
-          <button id="force-final" class="px-3 py-2 rounded-xl bg-fuchsia-700 hover:bg-fuchsia-600">Tving finale (1v1)</button>
-          <button id="pass-left" class="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50" disabled>Giv venstre (vælg kort)</button>
-          <button id="show-hand" class="px-3 py-2 rounded-xl bg-slate-700">Se mine kort</button>
+        <div>
+          <label class="text-sm">Pass-runder pr. runde</label>
+          <div class="flex gap-2">
+            <input id="pass-rounds" type="number" min="1" max="10" value="1" class="w-28 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700" />
+            <button id="set-pass" class="px-3 py-2 rounded-xl bg-sky-700 hover:bg-sky-600">Gem</button>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">Runden afsløres først efter så mange fulde omgang(e).</p>
         </div>
       </div>
 
-      <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-        <h3 class="font-semibold">Spillere</h3>
-        <ul id="players" class="mt-2 space-y-2 text-sm"></ul>
-
-        <h3 class="font-semibold mt-4">Log</h3>
-        <div id="log" class="scrollbox mt-2 h-60 overflow-auto text-xs bg-slate-950/40 border border-slate-800 rounded-xl p-2"></div>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button id="init" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500">Initialisér</button>
+        <button id="make" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500">Opret rum</button>
+        <input id="room" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700" placeholder="RUMKODE" />
+        <button id="join" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500">Join</button>
+        <span class="text-xs text-slate-400 self-center">Rum: <span id="ui-room" class="font-mono">—</span></span>
+        <span class="text-xs text-slate-400 self-center">Fase: <span id="ui-phase" class="px-2 py-1 rounded-full bg-slate-800 border border-slate-700">Lobby</span></span>
       </div>
-    </section>
 
-    <section class="rounded-3xl wood p-6">
-      <div class="circle" id="table"></div>
-      <div class="mt-3 flex flex-wrap items-center gap-2 sm:hidden">
-        <div class="token" id="pot-badge-sm">0</div><span class="text-xs text-slate-300">guld i potten</span>
+      <div class="mt-3 flex flex-wrap gap-2 items-center">
+        <button id="start-round" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500">Start runde</button>
+        <button id="reveal" class="px-3 py-2 rounded-xl bg-rose-700 hover:bg-rose-600">Afslør & eliminer</button>
+        <button id="force-final" class="px-3 py-2 rounded-xl bg-fuchsia-700 hover:bg-fuchsia-600">Tving finale (1v1)</button>
+
+        <!-- NY: intuitiv kortvalg -->
+        <button id="confirm-pass" class="ml-auto px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50" disabled>Bekræft valgt kort ➜ venstre</button>
+        <button id="show-hand" class="px-3 py-2 rounded-xl bg-slate-700">Se mine kort</button>
       </div>
-    </section>
+    </div>
 
-    <footer class="mt-8 text-xs text-slate-500">Fan-projekt til hjemmebrug. 🍻</footer>
-  </div>
+    <!-- Regler-boks -->
+    <aside class="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 rules">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold">Regler – “The Dead Man’s Draw”</h3>
+        <button id="toggle-rules" class="text-xs px-2 py-1 rounded-lg bg-slate-800 border border-slate-700">Skjul</button>
+      </div>
+      <div id="rules-body" class="mt-2 text-xs leading-5 space-y-2">
+        <p><strong>Formål:</strong> Undgå <span class="text-rose-400 font-semibold">Death</span>. Sidste spiller uden Death vinder potten.</p>
+        <p><strong>Opsætning:</strong> 8 kort totalt – 1× Death, 7× Life. Hver spiller får 2 kort. Alle lægger indsats i potten.</p>
+        <p><strong>Runde:</strong> Startspiller vælger ét af sine to kort og giver <em>venstre</em>. Turen går rundt bordet. Når en fuld omgang er gennemført, tælles det som <em>1 pass-runde</em>. DM vælger hvor mange pass-runder der spilles (feltet “Pass-runder pr. runde”).</p>
+        <p><strong>Afsløring:</strong> Når det aftalte antal pass-runder er spillet, vender alle deres kort. Spilleren med Death er <em>ude</em>. Potten bliver stående.</p>
+        <p><strong>Finale (1v1):</strong> 8 kort lægges i cirkel med billedsiden ned. Spillerne trækker på skift. Den der trækker Death taber; den anden vinder hele potten.</p>
+        <p><strong>Taverneregler (valgfrit):</strong> Bluff, side-bets, drikkeregler, magiske variationer.</p>
+      </div>
 
-  <script type="module">
-    /* ====== KONFIG: Din Supabase ====== */
-    const SUPABASE_URL  = "https://oiylsrbztgpplztngkhr.supabase.co";
-    const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9peWxzcmJ6dGdwcGx6dG5na2hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ3Mjg5NzUsImV4cCI6MjA3MDMwNDk3NX0.CtyNtAjAfH35Y1iTNB4SbQVczOiDFMybNgkftb3amUU";
+      <h3 class="font-semibold mt-4">Spillere</h3>
+      <ul id="players" class="mt-2 space-y-2 text-sm"></ul>
 
-    /* ====== Deps ====== */
-    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-    import Peer from 'https://esm.sh/simple-peer@9.11.1';
+      <h3 class="font-semibold mt-4">Log</h3>
+      <div id="log" class="scrollbox mt-2 h-56 overflow-auto text-xs bg-slate-950/40 border border-slate-800 rounded-xl p-2"></div>
+    </aside>
+  </section>
 
-    /* ====== Helpers ====== */
-    const $ = s => document.querySelector(s);
-    const log = (m)=>{ const d=document.createElement('div'); d.textContent = `[${new Date().toLocaleTimeString()}] ${m}`; $('#log').appendChild(d); $('#log').scrollTop = $('#log').scrollHeight; };
-    const rnd = (n)=>Math.floor(Math.random()*n);
+  <!-- Bord -->
+  <section class="rounded-3xl wood p-6">
+    <div class="circle" id="table"></div>
+    <div class="mt-3 flex flex-wrap items-center gap-2 sm:hidden">
+      <div class="token" id="pot-badge-sm">0</div><span class="text-xs text-slate-300">guld i potten</span>
+    </div>
+  </section>
 
-    /* ====== State ====== */
-    const S = {
-      useNet: true,
-      sb:null, channel:null, room:null, isHost:false,
-      me:{ id: crypto.randomUUID(), name:'' },
-      presence:{}, peers:new Map(),
-      phase:'lobby',
-      seats:[], alive:new Set(), startIdx:0, turnIdx:0,
-      hands:{}, counts:{}, localHand:[],
-      stake:10, pot:0, modePlayers:4,
-      bots:{},
-    };
-    const DEFAULT_NPCS = ["Barkeep Borin","Sable the Cutpurse","Priestess Kael","Old Man Rook","Garruk the Smith","Nina Nightjar","Sir Thorne","Mina Quickstep","Vex the Bard","Hilda Ember","Karn Ironjaw","Willow Whisper"];
+  <footer class="mt-8 text-xs text-slate-500">Fan-projekt til hjemmebrug. 🍻</footer>
+</div>
 
-    /* ====== UI wiring ====== */
-    const namesWrap = $('#names'), table = $('#table'), playersList = $('#players');
-    const potBadge = $('#pot-badge'), potBadgeSm = $('#pot-badge-sm');
-    const tabs = [...document.querySelectorAll('.tab')];
-    tabs.forEach(b=> b.onclick = ()=> setMode(parseInt(b.dataset.p,10)));
-    $('#fill-npc').onchange = renderNameInputs;
-    $('#use-net').onchange  = e => S.useNet = e.target.checked;
-    $('#my-name').oninput   = renderNameInputs;
+<script type="module">
+/* ====== KONFIG: Din Supabase ====== */
+const SUPABASE_URL  = "https://oiylsrbztgpplztngkhr.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9peWxzcmJ6dGdwcGx6dG5na2hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ3Mjg5NzUsImV4cCI6MjA3MDMwNDk3NX0.CtyNtAjAfH35Y1iTNB4SbQVczOiDFMybNgkftb3amUU";
 
-    function setMode(p){
-      S.modePlayers = p;
-      tabs.forEach(b=> b.classList.toggle('bg-emerald-700', parseInt(b.dataset.p,10)===p));
-      renderNameInputs();
-    }
-    function renderNameInputs(){
-      namesWrap.innerHTML = '';
-      const p = S.modePlayers, fillNPC = $('#fill-npc').checked;
-      for(let i=0;i<4;i++){
-        const npc = i>=p && fillNPC;
-        const div = document.createElement('div');
-        div.innerHTML = `
-          <label class="text-sm">${i<p?`Spiller ${i+1}`:`Sæde ${i+1}`}${npc?' (NPC)':''}</label>
-          <input data-seat="${i}" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 seat-name"
-                 placeholder="${npc? DEFAULT_NPCS[i%DEFAULT_NPCS.length] : 'Navn'}"
-                 value="${i===0?($('#my-name').value||''):''}">
-        `;
-        namesWrap.appendChild(div);
-      }
-    }
-    setMode(4);
+/* ====== Deps ====== */
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import Peer from 'https://esm.sh/simple-peer@9.11.1';
 
-    /* ====== Supabase init ====== */
-    let supabase;
-    $('#init').onclick = ()=>{
-      if(!S.useNet){ log('🔌 Offline/solo – springer Supabase over.'); return; }
-      supabase = createClient(SUPABASE_URL, SUPABASE_ANON, { realtime:{ params:{ eventsPerSecond:5 } } });
-      S.sb = supabase; log('✅ Supabase klar.');
-    };
+/* ====== Helpers ====== */
+const $ = s => document.querySelector(s);
+const log = (m)=>{ const d=document.createElement('div'); d.textContent = `[${new Date().toLocaleTimeString()}] ${m}`; $('#log').appendChild(d); $('#log').scrollTop = $('#log').scrollHeight; };
+const rnd = (n)=>Math.floor(Math.random()*n);
 
-    $('#make').onclick = async ()=>{ await ensureNetIfWanted(); setupNames(); const code = makeRoom(); $('#room').value=code; await join(code,true); };
-    $('#join').onclick = async ()=>{ await ensureNetIfWanted(); setupNames(); const code = ($('#room').value||'').trim().toUpperCase(); if(!code) return alert('Rumkode?'); await join(code,false); };
+/* ====== State ====== */
+const S = {
+  useNet: true,
+  sb:null, channel:null, room:null, isHost:false,
+  me:{ id: crypto.randomUUID(), name:'' },
+  presence:{}, peers:new Map(),
+  phase:'lobby',
+  seats:[], alive:new Set(), startIdx:0, turnIdx:0,
+  hands:{}, counts:{}, localHand:[],
+  stake:10, pot:0, modePlayers:4,
+  bots:{},
 
-    async function ensureNetIfWanted(){ if(!S.useNet) return; if(!S.sb) $('#init').click(); if(!S.sb) throw new Error('Supabase ikke initialiseret'); }
-    function makeRoom(){ const chars='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<5;i++) s+=chars[rnd(chars.length)]; return s; }
+  // NY: pass-runder
+  passTarget: 1,
+  passLapCount: 0,
 
-    /* ====== RIGTIG FIX: join – bind sæde 0 til S.me.id og lav bots online/offline ====== */
-    async function join(code, asHost){
-      S.room = code; S.isHost = !!asHost; $('#ui-room').textContent = code;
+  // NY: kortvalg
+  selectedIdx: null
+};
+const DEFAULT_NPCS = ["Barkeep Borin","Sable the Cutpurse","Priestess Kael","Old Man Rook","Garruk the Smith","Nina Nightjar","Sir Thorne","Mina Quickstep","Vex the Bard","Hilda Ember","Karn Ironjaw","Willow Whisper"];
 
-      // reset
-      S.alive = new Set(); S.bots = {}; S.presence = {}; S.localHand=[];
+/* ====== UI wiring ====== */
+const namesWrap = $('#names'), table = $('#table'), playersList = $('#players');
+const potBadge = $('#pot-badge'), potBadgeSm = $('#pot-badge-sm');
+const tabs = [...document.querySelectorAll('.tab')];
+tabs.forEach(b=> b.onclick = ()=> setMode(parseInt(b.dataset.p,10)));
+$('#fill-npc').onchange = renderNameInputs;
+$('#use-net').onchange  = e => S.useNet = e.target.checked;
+$('#my-name').oninput   = renderNameInputs;
+$('#toggle-rules').onclick = ()=>{
+  const body=$('#rules-body');
+  const btn=$('#toggle-rules');
+  if(body.classList.contains('hidden')){ body.classList.remove('hidden'); btn.textContent='Skjul'; }
+  else { body.classList.add('hidden'); btn.textContent='Vis'; }
+};
 
-      // navne fra inputs
-      const seatInputs = [...document.querySelectorAll('.seat-name')];
-      const inputNames = seatInputs.map((el,i)=> (el.value || el.placeholder || `Sæde ${i+1}`));
-      const p = S.modePlayers; const fillNPC = $('#fill-npc').checked;
+function setMode(p){
+  S.modePlayers = p;
+  tabs.forEach(b=> b.classList.toggle('bg-emerald-700', parseInt(b.dataset.p,10)===p));
+  renderNameInputs();
+}
+function renderNameInputs(){
+  namesWrap.innerHTML = '';
+  const p = S.modePlayers, fillNPC = $('#fill-npc').checked;
+  for(let i=0;i<4;i++){
+    const npc = i>=p && fillNPC;
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <label class="text-sm">${i<p?`Spiller ${i+1}`:`Sæde ${i+1}`}${npc?' (NPC)':''}</label>
+      <input data-seat="${i}" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 seat-name"
+             placeholder="${npc? DEFAULT_NPCS[i%DEFAULT_NPCS.length] : 'Navn'}"
+             value="${i===0?($('#my-name').value||''):''}">
+    `;
+    namesWrap.appendChild(div);
+  }
+}
+setMode(4);
 
-      const activeNames = [];
-      for(let i=0;i<4;i++){
-        if(i<p) activeNames.push(inputNames[i] || `Spiller ${i+1}`);
-        else if(fillNPC) activeNames.push(inputNames[i] || DEFAULT_NPCS[i%DEFAULT_NPCS.length]);
-      }
+/* ====== Supabase init ====== */
+let supabase;
+$('#init').onclick = ()=>{
+  if(!S.useNet){ log('🔌 Offline/solo – springer Supabase over.'); return; }
+  supabase = createClient(SUPABASE_URL, SUPABASE_ANON, { realtime:{ params:{ eventsPerSecond:5 } } });
+  S.sb = supabase; log('✅ Supabase klar.');
+};
 
-      // lav id'er til sæder
-      S.seats = activeNames.map(()=> crypto.randomUUID());
-      if(S.seats.length===0) S.seats = [crypto.randomUUID()];
-      S.seats[0] = S.me.id; // <- VIGTIGT: dit sæde er dit rigtige ID
+$('#make').onclick = async ()=>{ await ensureNetIfWanted(); setupNames(); const code = makeRoom(); $('#room').value=code; await join(code,true); };
+$('#join').onclick = async ()=>{ await ensureNetIfWanted(); setupNames(); const code = ($('#room').value||'').trim().toUpperCase(); if(!code) return alert('Rumkode?'); await join(code,false); };
 
-      // presence lokalt (så navne ikke er '?')
-      const myName = $('#my-name').value || 'DM';
-      S.me.name = myName;
-      S.presence[S.me.id] = { id:S.me.id, name:myName, host:S.isHost };
-      S.alive.add(S.me.id);
+$('#set-stake').onclick = ()=> publish({t:'stake', v: Math.max(0, parseInt($('#stake').value||'10',10))});
+$('#set-pass').onclick  = ()=> publish({t:'passTarget', v: Math.max(1, Math.min(10, parseInt($('#pass-rounds').value||'1',10)))});
 
-      for(let i=1;i<S.seats.length;i++){
-        const id = S.seats[i];
-        const nm = activeNames[i] || DEFAULT_NPCS[i%DEFAULT_NPCS.length];
-        S.presence[id] = { id, name:nm, host:false };
-        S.alive.add(id);
-        if(i >= p){ S.bots[id] = { isBot:true, name:nm, style:'normal' }; }
-      }
+/* ====== Net helpers ====== */
+async function ensureNetIfWanted(){ if(!S.useNet) return; if(!S.sb) $('#init').click(); if(!S.sb) throw new Error('Supabase ikke initialiseret'); }
+function makeRoom(){ const chars='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<5;i++) s+=chars[rnd(chars.length)]; return s; }
 
+/* ====== join – binder sæde 0 til dit ID, laver bots og presence ====== */
+async function join(code, asHost){
+  S.room = code; S.isHost = !!asHost; $('#ui-room').textContent = code;
+
+  S.alive = new Set(); S.bots = {}; S.presence = {}; S.localHand=[]; S.selectedIdx=null;
+  const seatInputs = [...document.querySelectorAll('.seat-name')];
+  const inputNames = seatInputs.map((el,i)=> (el.value || el.placeholder || `Sæde ${i+1}`));
+  const p = S.modePlayers; const fillNPC = $('#fill-npc').checked;
+
+  const activeNames = [];
+  for(let i=0;i<4;i++){
+    if(i<p) activeNames.push(inputNames[i] || `Spiller ${i+1}`);
+    else if(fillNPC) activeNames.push(inputNames[i] || DEFAULT_NPCS[i%DEFAULT_NPCS.length]);
+  }
+
+  S.seats = activeNames.map(()=> crypto.randomUUID());
+  if(S.seats.length===0) S.seats = [crypto.randomUUID()];
+  S.seats[0] = S.me.id; // dig
+
+  const myName = $('#my-name').value || 'DM';
+  S.me.name = myName;
+  S.presence[S.me.id] = { id:S.me.id, name:myName, host:S.isHost };
+  S.alive.add(S.me.id);
+
+  for(let i=1;i<S.seats.length;i++){
+    const id = S.seats[i];
+    const nm = activeNames[i] || DEFAULT_NPCS[i%DEFAULT_NPCS.length];
+    S.presence[id] = { id, name:nm, host:false };
+    S.alive.add(id);
+    if(i >= p){ S.bots[id] = { isBot:true, name:nm, style:'normal' }; }
+  }
+
+  renderPlayers(); recalcPot();
+
+  if(S.useNet){
+    if(!S.sb) $('#init').click();
+    S.channel = S.sb.channel(`tavern-${code}`, { config:{ broadcast:{ self:true }, presence:{ key:S.me.id } } });
+
+    S.channel.on('presence', {event:'sync'}, ()=>{
+      const st=S.channel.presenceState(); const list=Object.values(st).flat().map(p=>p.meta);
+      for(const p of list){ S.presence[p.id] = { id:p.id, name:p.name, host:!!p.host }; }
       renderPlayers(); recalcPot();
+    });
+    S.channel.on('broadcast',{event:'public'},({payload})=> onPublic(payload));
+    S.channel.on('broadcast',{event:'signal'},({payload})=> onSignal(payload));
 
-      // Realtime (kun hvis net er slået til)
-      if(S.useNet){
-        if(!S.sb) $('#init').click();
-        S.channel = S.sb.channel(`tavern-${code}`, { config:{ broadcast:{ self:true }, presence:{ key:S.me.id } } });
+    await S.channel.subscribe(async status=>{
+      if(status!=='SUBSCRIBED') return;
+      await S.channel.track({ id:S.me.id, name:myName, host:S.isHost });
+      log(`Du er ${myName}${S.isHost?' (host)':''}. Del rumkode: ${S.room}`);
+      if(S.isHost){ publish({t:'info', m:`Sæder: ${activeNames.join(', ')}`}); publish({t:'passTarget', v:S.passTarget}); publish({t:'stake', v:S.stake}); }
+    });
+  } else {
+    log('🔌 Offline/solo–mode.');
+  }
+}
 
-        S.channel.on('presence', {event:'sync'}, ()=>{
-          const st=S.channel.presenceState(); const list=Object.values(st).flat().map(p=>p.meta);
-          for(const p of list){ S.presence[p.id] = { id:p.id, name:p.name, host:!!p.host }; }
-          renderPlayers(); recalcPot();
-        });
-        S.channel.on('broadcast',{event:'public'},({payload})=> onPublic(payload));
-        S.channel.on('broadcast',{event:'signal'},({payload})=> onSignal(payload));
+/* ====== Broadcast routing ====== */
+function publish(payload){ if(S.useNet) S.channel.send({ type:'broadcast', event:'public', payload }); else onPublic(payload); }
+function onPublic(msg){
+  if(msg.t==='stake'){ S.stake=msg.v; recalcPot(); log(`Indsats: ${S.stake} guld`); }
+  if(msg.t==='passTarget'){ S.passTarget = Math.max(1, Math.min(10, msg.v|0)); $('#pass-rounds').value = S.passTarget; log(`Pass-runder pr. runde: ${S.passTarget}`); }
+  if(msg.t==='startRound'){ startRoundApply(msg.seed, msg.order, msg.startIdx); }
+  if(msg.t==='enableTurn'){ if(msg.id===S.me.id) enableTurn(); else maybeBotTakeTurn(msg.id); }
+  if(msg.t==='turn'){ applyTurn(msg.from, msg.to); }
+  if(msg.t==='reveal'){ doReveal(); }
+  if(msg.t==='elim'){ eliminate(msg.id); }
+  if(msg.t==='final'){ startFinal(msg.seed, msg.first); }
+  if(msg.t==='finalPick'){ finalApplyPick(msg.id, msg.idx, msg.card); }
+  if(msg.t==='end'){ endGame(msg.winner); }
+  if(msg.t==='info'){ log(msg.m); }
+  renderPlayers();
+}
 
-        await S.channel.subscribe(async status=>{
-          if(status!=='SUBSCRIBED') return;
-          await S.channel.track({ id:S.me.id, name:myName, host:S.isHost });
-          log(`Du er ${myName}${S.isHost?' (host)':''}. Del rumkode: ${S.room}`);
-          if(S.isHost) publish({t:'info', m:`Sæder: ${activeNames.join(', ')}`});
-        });
-      } else {
-        log('🔌 Offline/solo–mode.');
+/* ====== P2P til hemmelige kort (kun online) ====== */
+async function ensurePeer(otherId, initiator){
+  if(S.peers.has(otherId)) return S.peers.get(otherId);
+  const p = new Peer({ initiator, trickle:false });
+  p.on('signal',data=> S.channel.send({ type:'broadcast', event:'signal', payload:{from:S.me.id,to:otherId,data} }));
+  p.on('connect',()=> log(`🔗 P2P ${S.presence[otherId]?.name||otherId}`));
+  p.on('error',e=>console.warn('peer',e)); p.on('close',()=>S.peers.delete(otherId));
+  p.on('data',buf=>{ try{ const m=JSON.parse(buf.toString()); if(m.t==='card') receiveCard(m.card); }catch(e){} });
+  S.peers.set(otherId,p);
+  if(!initiator){ S.channel.send({ type:'broadcast', event:'signal', payload:{from:S.me.id,to:null,data:{type:'hello'}}}); }
+  return p;
+}
+function onSignal({from,to,data}){
+  if(!S.useNet) return;
+  if(data?.type==='hello' && S.isHost){ ensurePeer(from,true); return; }
+  if(to && to!==S.me.id) return;
+  let p = S.peers.get(from);
+  if(!p){
+    p=new Peer({initiator:false,trickle:false});
+    p.on('signal',d=> S.channel.send({ type:'broadcast', event:'signal', payload:{from:S.me.id,to:from,data:d} }));
+    p.on('connect',()=>log(`🔗 P2P ${S.presence[from]?.name||from}`));
+    p.on('error',e=>console.warn(e)); p.on('close',()=>S.peers.delete(from));
+    p.on('data',buf=>{ try{ const m=JSON.parse(buf.toString()); if(m.t==='card') receiveCard(m.card); }catch(e){} });
+    S.peers.set(from,p);
+  }
+  try{ p.signal(data); }catch(e){}
+}
+async function sendSecret(toId, card){
+  if(!S.useNet){ if(toId===S.me.id) receiveCard(card); else if(S.bots[toId]) botReceiveCard(toId,card); return; }
+  const p = await ensurePeer(toId, S.isHost); p.send(JSON.stringify({ t:'card', card }));
+}
+
+/* ====== Kontroller ====== */
+$('#start-round').onclick = ()=>{
+  if(S.alive.size===0){ S.alive = new Set(Object.keys(S.presence)); }
+  const alive = Array.from(S.alive);
+  if(alive.length<2) return alert('Kræver mindst 2 spillere. Slå NPC-fyld til eller brug 1p.');
+  if(alive.length===2) return publish({t:'final', seed:crypto.randomUUID(), first: alive[rnd(2)]});
+  const seed = crypto.randomUUID(); const order = alive.slice(); const startIdx = rnd(order.length);
+  publish({t:'startRound', seed, order, startIdx});
+};
+$('#reveal').onclick = ()=> publish({t:'reveal'});
+$('#force-final').onclick = ()=>{
+  const alive = Array.from(S.alive);
+  if(alive.length!==2) return alert('Finale kræver 2 spillere');
+  publish({t:'final', seed:crypto.randomUUID(), first: alive[rnd(2)]});
+};
+$('#show-hand').onclick = ()=> alert('Dine kort: ' + (S.localHand.length? S.localHand.map(c=>c==='death'?'DEATH':'Life').join(' , ') : '(ingen)'));
+
+/* ====== Rendering ====== */
+function renderPlayers(){
+  playersList.innerHTML='';
+  const ids = S.alive.size? Array.from(S.alive) : Object.keys(S.presence);
+  ids.forEach(id=>{
+    const li=document.createElement('li');
+    const alive=S.alive.has(id);
+    li.className='flex items-center justify-between px-3 py-2 rounded-lg bg-slate-950/50 border border-slate-800';
+    li.innerHTML=`<span>${S.presence[id]?.name||'?'}${S.presence[id]?.host?' <span class="text-amber-400 text-xs">(host)</span>':''}${S.bots[id]?' <span class="text-xs text-fuchsia-400">(NPC)</span>':''}</span>
+                  <span class="text-xs ${alive?'text-emerald-400':'text-rose-400'}">${alive?'i spil':'ude'}</span>`;
+    playersList.appendChild(li);
+  });
+
+  table.innerHTML='';
+  const n = ids.length||4; const r=210;
+  ids.forEach((id,i)=>{
+    const angle=(i/n)*Math.PI*2 - Math.PI/2;
+    const x=260+Math.cos(angle)*r, y=260+Math.sin(angle)*r;
+    const seat=document.createElement('div'); seat.className='seat'; seat.style.left=x+'px'; seat.style.top=y+'px';
+
+    // to kort per sæde – dine kort kan klikkes i egen tur
+    const c0 = document.createElement('div'); c0.className='card';
+    const c1 = document.createElement('div'); c1.className='card';
+
+    if(id===S.me.id){
+      if(S.localHand[0]==='life') c0.classList.add('life');
+      if(S.localHand[0]==='death') c0.classList.add('death');
+      if(S.localHand[1]==='life') c1.classList.add('life');
+      if(S.localHand[1]==='death') c1.classList.add('death');
+
+      // kun klik i egen tur
+      if(S.phase==='round' && S.seats[S.turnIdx]===id){
+        c0.classList.add('me-turn');
+        c1.classList.add('me-turn');
+
+        // markér valgt kort
+        if(S.selectedIdx===0) c0.classList.add('selected');
+        if(S.selectedIdx===1) c1.classList.add('selected');
+
+        c0.onclick = ()=> { S.selectedIdx = 0; $('#confirm-pass').disabled=false; renderPlayers(); };
+        c1.onclick = ()=> { S.selectedIdx = 1; $('#confirm-pass').disabled=false; renderPlayers(); };
       }
     }
 
-    function publish(payload){ if(S.useNet) S.channel.send({ type:'broadcast', event:'public', payload }); else onPublic(payload); }
+    seat.innerHTML = `<div class="text-center mb-1 ${S.phase==='round' && S.seats[S.turnIdx]===id?'text-amber-300':''}">${S.presence[id]?.name||'?'}</div>`;
+    const row=document.createElement('div');
+    row.className='flex items-center justify-center gap-2';
+    row.appendChild(c0); row.appendChild(c1);
+    seat.appendChild(row);
+    table.appendChild(seat);
+  });
 
-    /* ====== P2P til hemmelige kort (kun online) ====== */
-    async function ensurePeer(otherId, initiator){
-      if(S.peers.has(otherId)) return S.peers.get(otherId);
-      const p = new Peer({ initiator, trickle:false });
-      p.on('signal',data=> S.channel.send({ type:'broadcast', event:'signal', payload:{from:S.me.id,to:otherId,data} }));
-      p.on('connect',()=> log(`🔗 P2P ${S.presence[otherId]?.name||otherId}`));
-      p.on('error',e=>console.warn('peer',e)); p.on('close',()=>S.peers.delete(otherId));
-      S.peers.set(otherId,p);
-      if(!initiator){ S.channel.send({ type:'broadcast', event:'signal', payload:{from:S.me.id,to:null,data:{type:'hello'}}}); }
-      // modtag kort
-      p.on('data',buf=>{ try{ const m=JSON.parse(buf.toString()); if(m.t==='card') receiveCard(m.card); }catch(e){} });
-      return p;
-    }
-    function onSignal({from,to,data}){
-      if(!S.useNet) return;
-      if(data?.type==='hello' && S.isHost){ ensurePeer(from,true); return; }
-      if(to && to!==S.me.id) return;
-      let p = S.peers.get(from);
-      if(!p){
-        p=new Peer({initiator:false,trickle:false});
-        p.on('signal',d=> S.channel.send({ type:'broadcast', event:'signal', payload:{from:S.me.id,to:from,data:d} }));
-        p.on('connect',()=>log(`🔗 P2P ${S.presence[from]?.name||from}`));
-        p.on('error',e=>console.warn(e)); p.on('close',()=>S.peers.delete(from));
-        p.on('data',buf=>{ try{ const m=JSON.parse(buf.toString()); if(m.t==='card') receiveCard(m.card); }catch(e){} });
-        S.peers.set(from,p);
-      }
-      try{ p.signal(data); }catch(e){}
-    }
-    async function sendSecret(toId, card){
-      if(!S.useNet){ // offline: direkte levering
-        if(toId===S.me.id) receiveCard(card);
-        else if(S.bots[toId]) botReceiveCard(toId,card);
-        return;
-      }
-      const p = await ensurePeer(toId, S.isHost);
-      p.send(JSON.stringify({ t:'card', card }));
-    }
+  potBadge.textContent=String(S.pot); potBadgeSm.textContent=String(S.pot);
+  $('#ui-phase').textContent = ({lobby:'Lobby',round:'Runde',reveal:'Afsløring',final:'Finale',end:'Slut'})[S.phase]||S.phase;
 
-    /* ====== Public events ====== */
-    function onPublic(msg){
-      if(msg.t==='stake'){ S.stake=msg.v; recalcPot(); log(`Indsats: ${S.stake} guld`); }
-      if(msg.t==='startRound'){ startRoundApply(msg.seed, msg.order, msg.startIdx); }
-      if(msg.t==='enableTurn'){ if(msg.id===S.me.id) enableTurn(); else maybeBotTakeTurn(msg.id); }
-      if(msg.t==='turn'){ applyTurn(msg.from, msg.to); }
-      if(msg.t==='reveal'){ doReveal(); }
-      if(msg.t==='elim'){ eliminate(msg.id); }
-      if(msg.t==='final'){ startFinal(msg.seed, msg.first); }
-      if(msg.t==='finalPick'){ finalApplyPick(msg.id, msg.idx, msg.card); }
-      if(msg.t==='end'){ endGame(msg.winner); }
-      if(msg.t==='info'){ log(msg.m); }
-      renderPlayers();
-    }
+  // Bekræft-knap til pas
+  const canConfirm = (S.phase==='round' && S.seats[S.turnIdx]===S.me.id && S.selectedIdx!==null && S.localHand.length);
+  $('#confirm-pass').disabled = !canConfirm;
+}
 
-    /* ====== Kontroller ====== */
-    $('#set-stake').onclick = ()=> publish({t:'stake', v: Math.max(0, parseInt($('#stake').value||'10',10))});
-    $('#start-round').onclick = ()=>{
-      if(S.alive.size===0){ S.alive = new Set(Object.keys(S.presence)); }
-      const alive = Array.from(S.alive);
-      if(alive.length<2) return alert('Kræver mindst 2 spillere. Slå NPC-fyld til eller brug 1p.');
-      if(alive.length===2) return publish({t:'final', seed:crypto.randomUUID(), first: alive[rnd(2)]});
-      const seed = crypto.randomUUID(); const order = alive.slice(); const startIdx = rnd(order.length);
-      publish({t:'startRound', seed, order, startIdx});
-    };
-    $('#reveal').onclick = ()=> publish({t:'reveal'});
-    $('#force-final').onclick = ()=>{
-      const alive = Array.from(S.alive);
-      if(alive.length!==2) return alert('Finale kræver 2 spillere');
-      publish({t:'final', seed:crypto.randomUUID(), first: alive[rnd(2)]});
-    };
-    $('#pass-left').onclick = ()=> beginPass();
-    $('#show-hand').onclick = ()=> alert('Dine kort: ' + (S.localHand.length? S.localHand.map(c=>c==='death'?'DEATH':'Life').join(' , ') : '(ingen)'));
+/* ====== Pot ====== */
+function recalcPot(){ const active = Array.from(S.alive).length; S.pot = active * (S.stake||0); renderPlayers(); }
 
-    /* ====== Rendering ====== */
-    function renderPlayers(){
-      playersList.innerHTML='';
-      const ids = S.alive.size? Array.from(S.alive) : Object.keys(S.presence);
-      ids.forEach(id=>{
-        const li=document.createElement('li');
-        const alive=S.alive.has(id);
-        li.className='flex items-center justify-between px-3 py-2 rounded-lg bg-slate-950/50 border border-slate-800';
-        li.innerHTML=`<span>${S.presence[id]?.name||'?'}${S.presence[id]?.host?' <span class="text-amber-400 text-xs">(host)</span>':''}${S.bots[id]?' <span class="text-xs text-fuchsia-400">(NPC)</span>':''}</span>
-                      <span class="text-xs ${alive?'text-emerald-400':'text-rose-400'}">${alive?'i spil':'ude'}</span>`;
-        playersList.appendChild(li);
-      });
+/* ====== Runde-flow m. pass-runder ====== */
+function startRoundApply(seed, order, startIdx){
+  S.seats = order.slice(); S.startIdx=startIdx%S.seats.length; S.turnIdx=S.startIdx;
+  S.phase='round'; S.passLapCount=0; S.selectedIdx=null; renderPlayers(); log('🃏 Ny runde.');
 
-      table.innerHTML='';
-      const n = ids.length||4; const r=210;
-      ids.forEach((id,i)=>{
-        const angle=(i/n)*Math.PI*2 - Math.PI/2;
-        const x=260+Math.cos(angle)*r, y=260+Math.sin(angle)*r;
-        const seat=document.createElement('div'); seat.className='seat'; seat.style.left=x+'px'; seat.style.top=y+'px';
-        seat.innerHTML=`
-          <div class="text-center mb-1 ${S.phase==='round' && S.seats[S.turnIdx]===id?'text-amber-300':''}">${S.presence[id]?.name||'?'}</div>
-          <div class="flex items-center justify-center gap-2">
-            <div class="card ${id===S.me.id && S.localHand[0]==='life'?'life':''} ${id===S.me.id && S.localHand[0]==='death'?'death':''}"></div>
-            <div class="card ${id===S.me.id && S.localHand[1]==='life'?'life':''} ${id===S.me.id && S.localHand[1]==='death'?'death':''}"></div>
-          </div>`;
-        table.appendChild(seat);
-      });
+  // byg deck: 2 pr spiller, præcis 1 death i alt
+  const total = S.seats.length*2;
+  const deck = Array(total).fill('life'); deck[rnd(total)]='death';
+  S.hands={}; S.counts={}; S.localHand=[];
+  S.seats.forEach(id=> S.counts[id]=0);
 
-      potBadge.textContent=String(S.pot); potBadgeSm.textContent=String(S.pot);
-      $('#ui-phase').textContent = ({lobby:'Lobby',round:'Runde',reveal:'Afsløring',final:'Finale',end:'Slut'})[S.phase]||S.phase;
+  for(let i=0;i<S.seats.length;i++){
+    for(let c=0;c<2;c++){
+      const card = deck.splice(rnd(deck.length),1)[0];
+      const id = S.seats[i];
+      if(id===S.me.id) receiveCard(card);
+      else if(S.bots[id]) botReceiveCard(id,card);
+      else sendSecret(id,card);
     }
-    function recalcPot(){ const active = Array.from(S.alive).length; S.pot = active * (S.stake||0); renderPlayers(); }
+  }
+  publish({t:'enableTurn', id:S.seats[S.turnIdx]});
+  recalcPot();
+}
 
-    /* ====== Runde-flow ====== */
-    function startRoundApply(seed, order, startIdx){
-      S.seats = order.slice(); S.startIdx=startIdx%S.seats.length; S.turnIdx=S.startIdx;
-      S.phase='round'; renderPlayers(); log('🃏 Ny runde.');
+function receiveCard(card){ S.localHand.push(card); S.hands[S.me.id]=S.localHand; S.counts[S.me.id]=(S.counts[S.me.id]||0)+1; renderPlayers(); }
+function botReceiveCard(id, card){ S.hands[id]=(S.hands[id]||[]); S.hands[id].push(card); S.counts[id]=(S.counts[id]||0)+1; }
 
-      // byg deck: 2 pr spiller, præcis 1 death i alt
-      const total = S.seats.length*2;
-      const deck = Array(total).fill('life'); deck[rnd(total)]='death';
-      S.hands={}; S.counts={}; S.localHand=[];
-      S.seats.forEach(id=> S.counts[id]=0);
+/* Nyt: bekræft-knap sender valgt kort til venstre */
+$('#confirm-pass').onclick = ()=> {
+  if(!(S.phase==='round' && S.seats[S.turnIdx]===S.me.id)) return;
+  if(S.selectedIdx===null || S.localHand.length===0) return;
+  const idx = Math.min(S.selectedIdx, S.localHand.length-1);
+  const card = S.localHand.splice(idx,1)[0]; S.counts[S.me.id]--; S.selectedIdx=null;
+  const toIdx = (S.turnIdx+1)%S.seats.length; const to=S.seats[toIdx];
+  if(S.bots[to]) botReceiveCard(to,card); else if(to===S.me.id) receiveCard(card); else sendSecret(to,card);
+  publish({t:'turn', from:S.seats[S.turnIdx], to});
+  renderPlayers();
+};
 
-      for(let i=0;i<S.seats.length;i++){
-        for(let c=0;c<2;c++){
-          const card = deck.splice(rnd(deck.length),1)[0];
-          const id = S.seats[i];
-          if(id===S.me.id) receiveCard(card);
-          else if(S.bots[id]) botReceiveCard(id,card);
-          else sendSecret(id,card);
-        }
-      }
-      publish({t:'enableTurn', id:S.seats[S.turnIdx]});
-      recalcPot();
-    }
+function enableTurn(){
+  if(S.seats[S.turnIdx]!==S.me.id) return;
+  S.selectedIdx=null;
+  log('✨ Din tur: klik et kort og tryk "Bekræft".');
+  renderPlayers();
+}
 
-    function receiveCard(card){ S.localHand.push(card); S.hands[S.me.id]=S.localHand; S.counts[S.me.id]=(S.counts[S.me.id]||0)+1; renderPlayers(); }
-    function botReceiveCard(id, card){ S.hands[id]=(S.hands[id]||[]); S.hands[id].push(card); S.counts[id]=(S.counts[id]||0)+1; }
+function applyTurn(from,to){
+  // næste tur
+  const prevIdx = S.turnIdx;
+  S.turnIdx=(S.turnIdx+1)%S.seats.length;
 
-    function enableTurn(){
-      if(S.seats[S.turnIdx]!==S.me.id) return;
-      $('#pass-left').disabled=false; log('✨ Din tur: vælg et kort at give venstre.');
+  // Slut på EN omgang? (startspilleren modtager, og turpeger igen på start)
+  const lapEnded = (to===S.seats[S.startIdx]) && (S.turnIdx===S.startIdx);
+  if(lapEnded){
+    S.passLapCount++;
+    log(`🔁 Pass-runde ${S.passLapCount}/${S.passTarget} gennemført.`);
+    if(S.passLapCount >= S.passTarget){
+      S.phase='reveal'; renderPlayers(); log('🔔 Aftalt antal pass-runder nået – klar til afsløring.');
+      return;
     }
-    function beginPass(){
-      if(S.seats[S.turnIdx]!==S.me.id) return;
-      if(S.localHand.length<1) return alert('Ingen kort?');
-      const choice = (S.localHand.length===1)?0:(confirm('OK = giv første kort, Annuller = giv andet kort')?0:1);
-      const card = S.localHand.splice(choice,1)[0]; S.counts[S.me.id]--;
-      const toIdx = (S.turnIdx+1)%S.seats.length; const to=S.seats[toIdx];
-      if(S.bots[to]) botReceiveCard(to,card); else if(to===S.me.id) receiveCard(card); else sendSecret(to,card);
-      publish({t:'turn', from:S.seats[S.turnIdx], to});
-      $('#pass-left').disabled=true;
-    }
-    function applyTurn(from,to){
-      S.turnIdx=(S.turnIdx+1)%S.seats.length;
-      const rcvFromRight = (to===S.seats[S.startIdx]) && (S.turnIdx===S.startIdx);
-      if(rcvFromRight){ S.phase='reveal'; renderPlayers(); log('🔔 Runden slut – afslør.'); }
-      else publish({t:'enableTurn', id:S.seats[S.turnIdx]});
-      maybeBotTakeTurn(S.seats[S.turnIdx]);
-    }
+    // ny omgang starter – samme startspiller tager tur 1 i næste omgang
+    publish({t:'enableTurn', id:S.seats[S.turnIdx]});
+  } else {
+    publish({t:'enableTurn', id:S.seats[S.turnIdx]});
+  }
+  renderPlayers();
+  // hvis næste er bot, lad den spille
+  maybeBotTakeTurn(S.seats[S.turnIdx]);
+}
 
-    /* ====== Afsløring / Elimination ====== */
-    function doReveal(){
-      if(S.phase!=='reveal') return;
-      if((S.hands[S.me.id]||S.localHand).includes('death')) publish({t:'elim', id:S.me.id});
-      Object.keys(S.bots).forEach(id=>{ if((S.hands[id]||[]).includes('death')) publish({t:'elim', id}); });
-    }
-    function eliminate(id){
-      if(!S.alive.has(id)) return;
-      S.alive.delete(id);
-      log(`☠️ ${S.presence[id]?.name||id} er ude (Death).`);
-      const alive = Array.from(S.alive);
-      if(alive.length===1) publish({t:'end', winner:alive[0]});
-      else if(alive.length===2) publish({t:'final', seed:crypto.randomUUID(), first: alive[rnd(2)]});
-      else { S.phase='lobby'; renderPlayers(); log('Værten kan starte næste runde.'); }
-      recalcPot();
-    }
+/* ====== Afsløring / Elimination ====== */
+function doReveal(){
+  if(S.phase!=='reveal') return;
+  if((S.hands[S.me.id]||S.localHand).includes('death')) publish({t:'elim', id:S.me.id});
+  Object.keys(S.bots).forEach(id=>{ if((S.hands[id]||[]).includes('death')) publish({t:'elim', id}); });
+}
+function eliminate(id){
+  if(!S.alive.has(id)) return;
+  S.alive.delete(id);
+  log(`☠️ ${S.presence[id]?.name||id} er ude (Death).`);
+  const alive = Array.from(S.alive);
+  if(alive.length===1) publish({t:'end', winner:alive[0]});
+  else if(alive.length===2) publish({t:'final', seed:crypto.randomUUID(), first: alive[rnd(2)]});
+  else { S.phase='lobby'; renderPlayers(); log('Værten kan starte næste runde.'); }
+  recalcPot();
+}
 
-    /* ====== Finale ====== */
-    let F={deck:[], face:[], turn:null};
-    function startFinal(seed, first){
-      S.phase='final'; renderPlayers(); log('🏁 Finale! 8 kort i cirkel.');
-      F.deck = Array(8).fill('life'); F.deck[rnd(8)]='death'; F.face=Array(8).fill(false); F.turn=first;
-      if(F.turn===S.me.id) finalPickPrompt(); else if(S.bots[F.turn]) botFinalPick(F.turn);
-    }
-    function finalPickPrompt(){
-      const s=prompt('Finale: vælg felt 1–8'); const idx=Math.max(1,Math.min(8,parseInt(s||'1',10)))-1;
-      const card = F.deck[idx]; publish({t:'finalPick', id:S.me.id, idx, card});
-    }
-    function finalApplyPick(id, idx, card){
-      if(F.face[idx]) return; F.face[idx]=true;
-      log(`🎲 ${S.presence[id]?.name||id} trak ${card==='death'?'DEATH':'Life'}.`);
-      if(card==='death'){
-        const loser=id; const alive=Array.from(S.alive); const winner=alive.find(x=>x!==loser) || S.me.id;
-        publish({t:'end', winner}); return;
-      }
-      const alive=Array.from(S.alive); const other=alive.find(x=>x!==id);
-      F.turn=other; if(other===S.me.id) finalPickPrompt(); else if(S.bots[other]) botFinalPick(other);
-    }
-    function endGame(winner){
-      S.phase='end'; renderPlayers();
-      const name=S.presence[winner]?.name||'Ukendt';
-      log(`🏆 ${name} vinder og tager ${S.pot} guld!`); alert(`${name} vinder ${S.pot} guld!`);
-    }
+/* ====== Finale ====== */
+let F={deck:[], face:[], turn:null};
+function startFinal(seed, first){
+  S.phase='final'; renderPlayers(); log('🏁 Finale! 8 kort i cirkel.');
+  F.deck = Array(8).fill('life'); F.deck[rnd(8)]='death'; F.face=Array(8).fill(false); F.turn=first;
+  if(F.turn===S.me.id) finalPickPrompt(); else if(S.bots[F.turn]) botFinalPick(F.turn);
+}
+function finalPickPrompt(){
+  const s=prompt('Finale: vælg felt 1–8'); const idx=Math.max(1,Math.min(8,parseInt(s||'1',10)))-1;
+  const card = F.deck[idx]; publish({t:'finalPick', id:S.me.id, idx, card});
+}
+function finalApplyPick(id, idx, card){
+  if(F.face[idx]) return; F.face[idx]=true;
+  log(`🎲 ${S.presence[id]?.name||id} trak ${card==='death'?'DEATH':'Life'}.`);
+  if(card==='death'){
+    const loser=id; const alive=Array.from(S.alive); const winner=alive.find(x=>x!==loser) || S.me.id;
+    publish({t:'end', winner}); return;
+  }
+  const alive=Array.from(S.alive); const other=alive.find(x=>x!==id);
+  F.turn=other; if(other===S.me.id) finalPickPrompt(); else if(S.bots[other]) botFinalPick(other);
+}
+function endGame(winner){
+  S.phase='end'; renderPlayers();
+  const name=S.presence[winner]?.name||'Ukendt';
+  log(`🏆 ${name} vinder og tager ${S.pot} guld!`); alert(`${name} vinder ${S.pot} guld!`);
+}
 
-    /* ====== Bots ====== */
-    function maybeBotTakeTurn(id){
-      if(S.phase!=='round' || !S.bots[id]) return;
-      setTimeout(()=>{
-        const hand=S.hands[id]||[];
-        let pick = (hand.length<2)?0 : (Math.random()<0.6? (hand[0]==='death'?0:1) : (Math.random()<0.5?0:1));
-        const card = hand.splice(pick,1)[0];
-        const toIdx=(S.turnIdx+1)%S.seats.length; const to=S.seats[toIdx];
-        if(S.bots[to]) botReceiveCard(to,card); else if(to===S.me.id) receiveCard(card); else sendSecret(to,card);
-        publish({t:'turn', from:id, to});
-      }, 600 + rnd(600));
-    }
-    function botFinalPick(id){
-      setTimeout(()=>{
-        const choices=[]; for(let i=0;i<8;i++) if(!F.face[i]) choices.push(i);
-        const idx = choices[Math.floor(Math.random()*choices.length)];
-        const card = F.deck[idx]; publish({t:'finalPick', id, idx, card});
-      }, 700 + rnd(800));
-    }
+/* ====== Bots ====== */
+function maybeBotTakeTurn(id){
+  if(S.phase!=='round' || !S.bots[id]) return;
+  setTimeout(()=>{
+    const hand=S.hands[id]||[];
+    let pick = (hand.length<2)?0 : (Math.random()<0.6? (hand[0]==='death'?0:1) : (Math.random()<0.5?0:1));
+    const card = hand.splice(pick,1)[0];
+    const toIdx=(S.turnIdx+1)%S.seats.length; const to=S.seats[toIdx];
+    if(S.bots[to]) botReceiveCard(to,card); else if(to===S.me.id) receiveCard(card); else sendSecret(to,card);
+    publish({t:'turn', from:id, to});
+  }, 500 + rnd(700));
+}
+function botFinalPick(id){
+  setTimeout(()=>{
+    const choices=[]; for(let i=0;i<8;i++) if(!F.face[i]) choices.push(i);
+    const idx = choices[Math.floor(Math.random()*choices.length)];
+    const card = F.deck[idx]; publish({t:'finalPick', id, idx, card});
+  }, 700 + rnd(800));
+}
 
-    /* ====== Misc ====== */
-    function setupNames(){ S.me.name = $('#my-name').value || 'DM'; }
-  </script>
+/* ====== Misc ====== */
+function setupNames(){ S.me.name = $('#my-name').value || 'DM'; }
+</script>
 </body>
 </html>
