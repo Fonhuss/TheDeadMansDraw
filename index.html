@@ -31,32 +31,17 @@
   .rules a{color:#93c5fd;text-decoration:underline}
   .pill{display:inline-block;padding:.2rem .5rem;border-radius:9999px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:.75rem}
 
-  /* Klikvenlige modstander-kort */
   .opp-card-hit { cursor: pointer; padding: 4px; }
-  .opp-card-hit.targetable:hover {
-    transform: scale(1.04);
-    box-shadow: 0 0 18px rgba(96,165,250,.45);
-    outline: 2px solid #60a5fa;
-  }
+  .opp-card-hit.targetable:hover { transform: scale(1.04); box-shadow: 0 0 18px rgba(96,165,250,.45); outline: 2px solid #60a5fa; }
 
-  /* Vælger-overlay til "giv tilbage" */
-  #swap-chooser {
-    position:absolute; left:50%; transform:translateX(-50%);
-    bottom:-8px;
-    background:rgba(15,23,42,.95);
-    border:1px solid #334155; border-radius:12px;
-    padding:.5rem; display:none; min-width:220px;
-    box-shadow:0 8px 24px rgba(0,0,0,.5);
-  }
+  #swap-chooser { position:absolute; left:50%; transform:translateX(-50%); bottom:-8px; background:rgba(15,23,42,.95);
+    border:1px solid #334155; border-radius:12px; padding:.5rem; display:none; min-width:220px; box-shadow:0 8px 24px rgba(0,0,0,.5); }
   #swap-chooser.show { display:block; }
-  #swap-chooser .opt {
-    padding:.35rem .6rem; border:1px solid #334155; border-radius:10px;
-    display:flex; align-items:center; justify-content:space-between;
-    background:#0b1221; cursor:pointer; margin-bottom:.35rem;
-  }
+  #swap-chooser .opt { padding:.35rem .6rem; border:1px solid #334155; border-radius:10px; display:flex; align-items:center; justify-content:space-between;
+    background:#0b1221; cursor:pointer; margin-bottom:.35rem; }
   #swap-chooser .opt.active { outline:2px solid #fbbf24; }
-  #swap-chooser .tag { font-size:.7rem; padding:.1rem .4rem; border-radius:9999px;
-    border:1px solid #475569; background:#111827; }
+  #swap-chooser .tag { font-size:.7rem; padding:.1rem .4rem; border-radius:9999px; border:1px solid #475569; background:#111827; }
+
   @media (max-width:640px){.circle{width:92vw;height:92vw}.seat{width:30vw;height:34vw}.card{width:10vw;height:14vw}}
 </style>
 </head>
@@ -83,7 +68,7 @@
         <button class="tab px-3 py-1 rounded-lg bg-slate-800 border border-slate-700" data-p="2">2p</button>
         <button class="tab px-3 py-1 rounded-lg bg-slate-800 border border-slate-700" data-p="3">3p</button>
         <button class="tab px-3 py-1 rounded-lg bg-slate-800 border border-slate-700" data-p="4">4p</button>
-        <label class="ml-2 text-xs flex items-center gap-2"><input id="fill-npc" type="checkbox" class="accent-amber-500"> Fyld tomme sæder med NPC’er</label>
+        <label class="ml-2 text-xs flex items-center gap-2"><input id="fill-npc" type="checkbox" class="accent-amber-500" checked> Fyld tomme sæder med NPC’er</label>
         <label class="ml-2 text-xs flex items-center gap-2"><input id="use-net" type="checkbox" class="accent-emerald-500" checked> Online (Supabase)</label>
       </div>
 
@@ -132,7 +117,6 @@
       </div>
     </div>
 
-    <!-- Sidepanel: Regler + Log (kollapset fra start) + Spillere -->
     <aside class="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 rules">
       <div class="flex items-center justify-between">
         <h3 class="font-semibold">Regler – “Stjæl & Byt”</h3>
@@ -159,7 +143,6 @@
     </aside>
   </section>
 
-  <!-- Bord -->
   <section class="rounded-3xl wood p-6">
     <div class="circle" id="table"></div>
     <div class="mt-3 flex flex-wrap items-center gap-2 sm:hidden">
@@ -171,11 +154,9 @@
 </div>
 
 <script type="module">
-/* ====== KONFIG: Din Supabase ====== */
+/* ====== Supabase ====== */
 const SUPABASE_URL  = "https://oiylsrbztgpplztngkhr.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9peWxzcmJ6dGdwcGx6dG5na2hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ3Mjg5NzUsImV4cCI6MjA3MDMwNDk3NX0.CtyNtAjAfH35Y1iTNB4SbQVczOiDFMybNgkftb3amUU";
-
-/* ====== Deps ====== */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Peer from 'https://esm.sh/simple-peer@9.11.1';
 
@@ -189,18 +170,23 @@ const S = {
   useNet:true, sb:null, channel:null, room:null, isHost:false,
   me:{ id: crypto.randomUUID(), name:'' },
   presence:{}, peers:new Map(),
+
   phase:'lobby',
-  seats:[], alive:new Set(), startIdx:0, turnIdx:0,
+  seats:[],           // autoritativ sæderækkefølge fra host (array af ids)
+  alive:new Set(),
+  bots:{},
+
+  startIdx:0, turnIdx:0,
   hands:{}, counts:{}, localHand:[],
-  stake:10, pot:0, modePlayers:4, bots:{},
+  stake:10, pot:0, modePlayers:4,
 
   passTarget:1, passLapCount:0,
 
-  // Steal & swap UI-state
+  // UI-turn
   turnStage:'idle', // 'chooseTarget' | 'chooseOppCard' | 'chooseGiveBack' | 'idle'
   pending:{ targetId:null, oppIdx:null, receivedIndex:null },
-
   selectedIdx:null,
+
   botTimer:null
 };
 const DEFAULT_NPCS = ["Barkeep Borin","Sable the Cutpurse","Priestess Kael","Old Man Rook","Garruk the Smith","Nina Nightjar","Sir Thorne","Mina Quickstep","Vex the Bard","Hilda Ember","Karn Ironjaw","Willow Whisper"];
@@ -210,14 +196,13 @@ const namesWrap=$('#names'), table=$('#table'), playersList=$('#players');
 const potBadge=$('#pot-badge'), potBadgeSm=$('#pot-badge-sm');
 const confirmBtn = $('#confirm-swap');
 
-/* ====== Tabs & toggles ====== */
+/* ====== Tabs/toggles ====== */
 const tabs=[...document.querySelectorAll('.tab')];
 tabs.forEach(b=> b.onclick=()=> setMode(parseInt(b.dataset.p,10)));
 $('#fill-npc').onchange = renderNameInputs;
 $('#use-net').onchange  = e => S.useNet = e.target.checked;
 $('#my-name').oninput   = renderNameInputs;
 
-// Collapsers
 $('#toggle-rules').onclick = ()=>{
   const body=$('#rules-body'); const btn=$('#toggle-rules');
   if(body.classList.contains('hidden')){ body.classList.remove('hidden'); btn.textContent='Skjul'; }
@@ -256,17 +241,19 @@ $('#init').onclick=()=>{
 $('#make').onclick = async ()=>{ await ensureNetIfWanted(); setupNames(); const code=makeRoom(); $('#room').value=code; await join(code,true); };
 $('#join').onclick = async ()=>{ await ensureNetIfWanted(); setupNames(); const code=($('#room').value||'').trim().toUpperCase(); if(!code) return alert('Rumkode?'); await join(code,false); };
 
-$('#set-stake').onclick = ()=> publish({t:'stake', v: Math.max(0, parseInt($('#stake').value||'10',10))});
-$('#set-pass').onclick  = ()=> publish({t:'passTarget', v: Math.max(1, Math.min(10, parseInt($('#pass-rounds').value||'1',10)))});
+$('#set-stake').onclick = ()=> isHostOnly(()=> publish({t:'stake', v: Math.max(0, parseInt($('#stake').value||'10',10))}));
+$('#set-pass').onclick  = ()=> isHostOnly(()=> publish({t:'passTarget', v: Math.max(1, Math.min(10, parseInt($('#pass-rounds').value||'1',10)))}));
 
 /* ====== Net helpers ====== */
 async function ensureNetIfWanted(){ if(!S.useNet) return; if(!S.sb) $('#init').click(); if(!S.sb) throw new Error('Supabase ikke initialiseret'); }
 function makeRoom(){ const chars='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<5;i++) s+=chars[rnd(chars.length)]; return s; }
+function isHostOnly(fn){ if(!S.isHost){ alert('Kun værten kan ændre dette.'); return; } fn(); }
 
-/* ====== Join (presence + bots) ====== */
+/* ====== Join (presence + seatmap) ====== */
 async function join(code, asHost){
   S.room=code; S.isHost=!!asHost; $('#ui-room').textContent=code;
   S.alive=new Set(); S.bots={}; S.presence={}; S.localHand=[]; S.selectedIdx=null; S.turnStage='idle'; S.pending={targetId:null,oppIdx:null,receivedIndex:null};
+  S.hands={}; S.counts={}; S.seats=[];
 
   const seatInputs=[...document.querySelectorAll('.seat-name')];
   const inputNames = seatInputs.map((el,i)=> (el.value||el.placeholder||`Sæde ${i+1}`));
@@ -274,79 +261,115 @@ async function join(code, asHost){
   const activeNames=[];
   for(let i=0;i<4;i++){ if(i<p) activeNames.push(inputNames[i]||`Spiller ${i+1}`); else if(fillNPC) activeNames.push(inputNames[i]||DEFAULT_NPCS[i%DEFAULT_NPCS.length]); }
 
-  S.seats = activeNames.map(()=> crypto.randomUUID());
-  if(S.seats.length===0) S.seats=[crypto.randomUUID()];
-  S.seats[0]=S.me.id;
-
   const myName=$('#my-name').value||'DM'; S.me.name=myName;
-  S.presence[S.me.id]={id:S.me.id,name:myName,host:S.isHost}; S.alive.add(S.me.id);
-  for(let i=1;i<S.seats.length;i++){
-    const id=S.seats[i]; const nm=activeNames[i]||DEFAULT_NPCS[i%DEFAULT_NPCS.length];
-    S.presence[id]={id,name:nm,host:false}; S.alive.add(id);
-    if(i>=p){ S.bots[id]={isBot:true,name:nm,style:'normal'}; }
-  }
-
-  renderAll(); recalcPot();
 
   if(S.useNet){
     if(!S.sb) $('#init').click();
 
-    // --- realtime channel (broadcast + presence) ---
-    S.channel = S.sb.channel(`tavern-${code}`, {
-      config: { broadcast: { self: true }, presence: { key: S.me.id } }
+    S.channel = S.sb.channel(`tavern-${code}`, { config:{ broadcast:{ self:true }, presence:{ key:S.me.id } } });
+
+    S.channel.on('presence',{event:'sync'},()=>{
+      const st=S.channel.presenceState(); const list=Object.values(st).flat().map(p=>p.meta);
+      for(const p of list){ S.presence[p.id]={id:p.id,name:p.name,host:!!p.host}; }
+      renderAll();
+      log('👥 Presence sync: ' + list.map(p=>p.name).join(', '));
+      if(S.isHost){ assignMissingSeats(); }
     });
 
-    // status logs
-    S.channel.on('system', { event: 'join' }, () => log('🔌 Realtime: join'));
-    S.channel.on('system', { event: 'leave' }, () => log('🔌 Realtime: leave'));
+    S.channel.on('broadcast',{event:'public'},({payload})=> onPublic(payload));
+    S.channel.on('broadcast',{event:'signal'},({payload})=> onSignal(payload));
 
-    // presence sync => opdatér deltagerliste
-    S.channel.on('presence', { event: 'sync' }, () => {
-      const st = S.channel.presenceState();
-      const list = Object.values(st).flat().map(p => p.meta);
-      for (const p of list) S.presence[p.id] = { id: p.id, name: p.name, host: !!p.host };
-      renderAll(); recalcPot();
-      log('👥 Presence sync: ' + list.map(p => p.name).join(', '));
-    });
-
-    // broadcasts
-    S.channel.on('broadcast', { event: 'public' }, ({ payload }) => onPublic(payload));
-    S.channel.on('broadcast', { event: 'signal' }, ({ payload }) => onSignal(payload));
-
-    // subscribe (VENT og tjek fejl)
     const { error: subErr } = await S.channel.subscribe();
     if (subErr) { console.error(subErr); log('❌ Realtime subscribe fejlede: ' + subErr.message); return; }
-
     log('✅ Realtime SUBSCRIBED – tracker dig i rummet...');
-    const { error: trackErr } = await S.channel.track({ id: S.me.id, name: myName, host: S.isHost });
+    const { error: trackErr } = await S.channel.track({ id:S.me.id, name:myName, host:S.isHost });
     if (trackErr) { console.error(trackErr); log('❌ Presence track fejlede: ' + trackErr.message); }
+    const rt = $('#ui-rt'); if(rt) rt.textContent = 'Tilsluttet';
 
-    const rt = $('#ui-rt'); if (rt) rt.textContent = 'Tilsluttet';
-
-    // del opsætningsinfo hvis du er host
-    if (S.isHost) {
-      publish({ t: 'info', m: `Sæder: ${activeNames.join(', ')}` });
-      publish({ t: 'passTarget', v: S.passTarget });
-      publish({ t: 'stake', v: S.stake });
+    // Host: initial seatmap
+    if(S.isHost){
+      // Lav sæder: [host, (menneske-pladser eller NPC’er)] – host altid seat 0
+      S.seats=[S.me.id];
+      for(let i=1;i<activeNames.length;i++){
+        const npcId = crypto.randomUUID();
+        S.seats.push(npcId);
+        S.bots[npcId]={isBot:true,name:activeNames[i]};
+      }
+      S.alive = new Set(S.seats);
+      publish({t:'config', stake:S.stake, passTarget:S.passTarget});
+      broadcastSeatmap();
+      log(`Du er ${myName} (host). Del rumkode: ${S.room}`);
+    } else {
+      // Klient: bed om sæde
+      publish({t:'seatRequest', id:S.me.id, name:myName});
     }
-  } else { log('🔌 Offline/solo–mode.'); }
+  } else {
+    // Offline/solo
+    log('🔌 Offline/solo–mode.');
+    S.seats=[S.me.id];
+    for(let i=1;i<activeNames.length;i++){ const npcId=crypto.randomUUID(); S.seats.push(npcId); S.bots[npcId]={isBot:true,name:activeNames[i]}; }
+    S.alive = new Set(S.seats);
+    S.presence[S.me.id]={id:S.me.id,name:myName,host:true};
+    renderAll();
+  }
+
+  recalcPot();
+}
+
+/* ====== Seatmap – host autoritet ====== */
+function assignMissingSeats(){
+  // Find alle presence-ids der ikke er i seats (og som ikke er bots)
+  const presentIds = Object.keys(S.presence);
+  const unknown = presentIds.filter(id => !S.seats.includes(id) && !S.bots[id]);
+  if(!unknown.length) return;
+
+  // Find første plads som i seat-listen er en NPC (kan erstattes) eller mangler
+  for(const uid of unknown){
+    // find en NPC-plads at overtage (ikke seat 0, som er host)
+    let idx = S.seats.findIndex((sid, i)=> i>0 && S.bots[sid]);
+    if(idx === -1){
+      // hvis ingen NPC-plads: hvis vi har <4 sæder, kan vi tilføje én
+      if(S.seats.length<4){ idx = S.seats.length; S.seats.push(uid); }
+      else { log(`⚠️ Ingen ledig plads til ${S.presence[uid]?.name||uid}`); continue; }
+    } else {
+      // fjern bot på pladsen
+      const botId = S.seats[idx];
+      delete S.bots[botId];
+      S.seats[idx] = uid;
+    }
+    S.alive.add(uid);
+    log(`🪑 Placerer ${S.presence[uid]?.name||'spiller'} på sæde ${idx+1}.`);
+  }
+  broadcastSeatmap();
+}
+function broadcastSeatmap(){
+  publish({t:'seatmap', seats:S.seats, bots: Object.fromEntries(Object.entries(S.bots).map(([id,b])=>[id,{name:b.name}]))});
+  renderAll();
 }
 
 /* ====== Broadcast routing ====== */
 function publish(payload){ if(S.useNet) S.channel.send({type:'broadcast',event:'public',payload}); else onPublic(payload); }
 function onPublic(msg){
-  if(msg.t==='stake'){ S.stake=msg.v; recalcPot(); log(`Indsats: ${S.stake} guld`); }
-  if(msg.t==='passTarget'){ S.passTarget=Math.max(1,Math.min(10,msg.v|0)); $('#pass-rounds').value=S.passTarget; log(`Pass-runder pr. runde: ${S.passTarget}`); }
-  if(msg.t==='startRound'){ startRoundApply(msg.seed, msg.order, msg.startIdx); }
+  if(msg.t==='config'){ if(typeof msg.stake==='number') S.stake=msg.stake; if(typeof msg.passTarget==='number') S.passTarget=msg.passTarget; $('#stake').value=S.stake; $('#pass-rounds').value=S.passTarget; recalcPot(); }
+  if(msg.t==='seatRequest' && S.isHost){ assignMissingSeats(); }
+  if(msg.t==='seatmap'){ S.seats = msg.seats.slice(); S.bots={}; for(const [id,b] of Object.entries(msg.bots||{})){ S.bots[id]={isBot:true,name:b.name}; } S.alive = new Set(S.seats); renderAll(); recalcPot(); }
+
+  if(msg.t==='stake'){ if(S.isHost){ publish({t:'config', stake:msg.v}); } S.stake=msg.v; recalcPot(); log(`Indsats: ${S.stake} guld`); }
+  if(msg.t==='passTarget'){ if(S.isHost){ publish({t:'config', passTarget:msg.v}); } S.passTarget=Math.max(1,Math.min(10,msg.v|0)); $('#pass-rounds').value=S.passTarget; log(`Pass-runder pr. runde: ${S.passTarget}`); }
+
+  if(msg.t==='startRound'){ startRoundApply(msg.order, msg.startIdx, msg.dealer); }
   if(msg.t==='enableTurn'){ if(msg.id===S.me.id) beginMyTurn(); else maybeBotTakeTurn(msg.id); }
+
   if(msg.t==='askOppCard'){ onAskOppCard(msg.thief, msg.target, msg.idx); }
   if(msg.t==='gotOppCard'){ onGotOppCard(msg.thief); }
   if(msg.t==='turnDone'){ applyTurnAdvance(); }
+
   if(msg.t==='reveal'){ doReveal(); }
   if(msg.t==='elim'){ eliminate(msg.id); }
-  if(msg.t==='final'){ startFinal(msg.seed, msg.first); }
+  if(msg.t==='final'){ startFinal(msg.first); }
   if(msg.t==='finalPick'){ finalApplyPick(msg.id, msg.idx, msg.card); }
   if(msg.t==='end'){ endGame(msg.winner); }
+
   if(msg.t==='info'){ log(msg.m); }
   renderAll();
 }
@@ -359,16 +382,15 @@ async function ensurePeer(otherId, initiator){
   p.on('data',buf=>{ try{ const m=JSON.parse(buf.toString()); if(m.t==='cardToThief') thiefReceiveCard(m.card); if(m.t==='cardToTarget') targetReceiveCard(m.card, m.target); }catch(e){} });
   p.on('error',e=>console.warn(e)); p.on('close',()=>S.peers.delete(otherId));
   S.peers.set(otherId,p);
-  if(!initiator) S.channel.send({type:'broadcast',event:'signal',payload:{from:S.me.id,to:null,data:{type:'hello'}}});
   return p;
 }
 function onSignal({from,to,data}){
   if(!S.useNet) return;
-  if(data?.type==='hello' && S.isHost){ ensurePeer(from,true); return; }
   if(to && to!==S.me.id) return;
   let p=S.peers.get(from);
+  const init = !p && S.isHost; // host initierer
   if(!p){
-    p=new Peer({initiator:false,trickle:false});
+    p=new Peer({initiator:init,trickle:false});
     p.on('signal',d=> S.channel.send({type:'broadcast',event:'signal',payload:{from:S.me.id,to:from,data:d}}));
     p.on('data',buf=>{ try{ const m=JSON.parse(buf.toString()); if(m.t==='cardToThief') thiefReceiveCard(m.card); if(m.t==='cardToTarget') targetReceiveCard(m.card, m.target); }catch(e){} });
     p.on('error',e=>console.warn(e)); p.on('close',()=>S.peers.delete(from));
@@ -376,35 +398,34 @@ function onSignal({from,to,data}){
   }
   try{ p.signal(data); }catch(e){}
 }
-async function sendCardToThief(fromId, thiefId, card){
+async function sendCardToThief(thiefId, card){
   if(!S.useNet){ if(thiefId===S.me.id) thiefReceiveCard(card); return; }
   const p=await ensurePeer(thiefId, S.isHost); p.send(JSON.stringify({t:'cardToThief', card}));
 }
-async function sendCardToTarget(thiefId, targetId, card){
+async function sendCardToTarget(targetId, card){
   if(!S.useNet){ if(targetId===S.me.id) targetReceiveCard(card, targetId); return; }
   const p=await ensurePeer(targetId, S.isHost); p.send(JSON.stringify({t:'cardToTarget', card, target:targetId}));
 }
 
 /* ====== Kontroller ====== */
 $('#start-round').onclick=()=>{
-  if(S.alive.size===0) S.alive=new Set(Object.keys(S.presence));
-  const alive=Array.from(S.alive);
-  if(alive.length<2) return alert('Kræver mindst 2 spillere. Slå NPC-fyld til eller brug 1p.');
-  if(alive.length===2) return publish({t:'final',seed:crypto.randomUUID(),first:alive[rnd(2)]});
+  if(!S.isHost){ alert('Kun værten kan starte en runde.'); return; }
+  if(S.alive.size===0) S.alive=new Set(S.seats);
+  const alive = Array.from(S.alive);
+  if(alive.length<2) return alert('Kræver mindst 2 spillere. Fyld op med NPC’er eller spil 1p.');
+  if(alive.length===2){ publish({t:'final', first:alive[rnd(2)]}); return; }
 
-  // Du starter altid
-  const order = alive.slice();
-  const myIndex = order.indexOf(S.me.id);
-  if(myIndex>0){ const [me] = order.splice(myIndex,1); order.unshift(me); }
+  // Host vælger rækkefølge = sæderækkefølge, start ved host (index 0)
+  const order = S.seats.slice();
   const startIdx = 0;
-
-  publish({t:'startRound',seed:crypto.randomUUID(),order,startIdx});
+  publish({t:'startRound', order, startIdx, dealer:S.me.id});
 };
-$('#reveal').onclick = ()=> publish({t:'reveal'});
+$('#reveal').onclick = ()=> isHostOnly(()=> publish({t:'reveal'}));
 $('#force-final').onclick=()=>{
+  if(!S.isHost){ alert('Kun værten kan tvinge finale.'); return; }
   const alive=Array.from(S.alive);
   if(alive.length!==2) return alert('Finale kræver 2 spillere');
-  publish({t:'final',seed:crypto.randomUUID(),first:alive[rnd(2)]});
+  publish({t:'final', first:alive[rnd(2)]});
 };
 $('#show-hand').onclick=()=>{
   const label = S.localHand.map((c)=> (c==='death'?'DEATH':'Life')).join(' , ');
@@ -424,22 +445,29 @@ function renderAll(){
   );
   potBadge.textContent=String(S.pot); potBadgeSm.textContent=String(S.pot);
   const rt=$('#ui-rt'); if(rt) rt.textContent = S.channel ? 'Tilsluttet' : 'Ikke forbundet';
+
+  // deaktiver start-knap hos ikke-host
+  $('#start-round').disabled = !S.isHost;
+  $('#set-stake').disabled  = !S.isHost;
+  $('#set-pass').disabled   = !S.isHost;
+
   confirmBtn.disabled = !(S.turnStage==='chooseGiveBack' && S.selectedIdx!==null);
 }
 function renderPlayers(){
   playersList.innerHTML='';
-  const ids=S.alive.size? Array.from(S.alive):Object.keys(S.presence);
+  const ids=S.seats.length? S.seats : Object.keys(S.presence);
   ids.forEach(id=>{
     const li=document.createElement('li');
     const alive=S.alive.has(id);
+    const name = S.presence[id]?.name || S.bots[id]?.name || 'NPC';
     li.className='flex items-center justify-between px-3 py-2 rounded-lg bg-slate-950/50 border border-slate-800';
-    li.innerHTML=`<span>${S.presence[id]?.name||'?'}${S.presence[id]?.host?' <span class="text-amber-400 text-xs">(host)</span>':''}${S.bots[id]?' <span class="text-xs text-fuchsia-400">(NPC)</span>':''}</span>
+    li.innerHTML=`<span>${name}${S.presence[id]?.host?' <span class="text-amber-400 text-xs">(host)</span>':''}${S.bots[id]?' <span class="text-xs text-fuchsia-400">(NPC)</span>':''}</span>
                   <span class="text-xs ${alive?'text-emerald-400':'text-rose-400'}">${alive?'i spil':'ude'}</span>`;
     playersList.appendChild(li);
   });
 }
 function renderTable(){
-  const ids = S.alive.size ? Array.from(S.alive) : Object.keys(S.presence);
+  const ids = S.seats.length? S.seats : Object.keys(S.presence);
   table.innerHTML = '';
   const n = ids.length || 4; const r = 220;
 
@@ -449,9 +477,8 @@ function renderTable(){
     const seat=document.createElement('div'); seat.className='seat'; seat.style.left=x+'px'; seat.style.top=y+'px';
 
     const isTurnSeat = (S.phase==='round' && S.seats[S.turnIdx]===id);
-    seat.insertAdjacentHTML('afterbegin',
-      `<div class="text-center mb-1 ${isTurnSeat?'text-amber-300':''}">${S.presence[id]?.name||'?'}</div>`
-    );
+    const name = S.presence[id]?.name || S.bots[id]?.name || 'NPC';
+    seat.insertAdjacentHTML('afterbegin', `<div class="text-center mb-1 ${isTurnSeat?'text-amber-300':''}">${name}</div>`);
 
     const row=document.createElement('div'); row.className='flex items-center justify-center gap-3';
 
@@ -475,7 +502,7 @@ function renderTable(){
         row.appendChild(c);
       });
 
-      // overlay-vælger under mit sæde i chooseGiveBack
+      // overlay vælger
       const chooser = document.createElement('div');
       chooser.id='swap-chooser';
       if(S.phase==='round' && S.seats[S.turnIdx]===id && S.turnStage==='chooseGiveBack'){
@@ -503,16 +530,14 @@ function renderTable(){
       seat.appendChild(chooser);
 
     } else {
-      // MODSTANDERE: venstre/højre kort som ét-klik valg
+      // modstandere: venstre/højre klik
       for(let k=0;k<2;k++){
         const c=document.createElement('button');
         c.type='button';
         c.className='card opp-card-hit';
         c.title = 'Klik for at vælge';
-
         if(S.phase==='round' && S.seats[S.turnIdx]===S.me.id){
           if(S.turnStage==='chooseTarget'){
-            // ét klik: sæt mål + vælg L/R med det samme
             c.classList.add('me-turn','targetable');
             c.onclick = ()=>{
               if(id===S.me.id) return;
@@ -521,7 +546,6 @@ function renderTable(){
               chooseOppCardIndex(k);
             };
           } else if(S.turnStage==='chooseOppCard' && S.pending.targetId===id){
-            // fallback hvis mål allerede er valgt
             c.classList.add('me-turn','targetable');
             c.onclick = ()=> chooseOppCardIndex(k);
             c.onmouseenter = ()=> c.classList.add('selected');
@@ -538,27 +562,30 @@ function renderTable(){
 }
 
 /* ====== Pot ====== */
-function recalcPot(){ const active=Array.from(S.alive).length; S.pot=active*(S.stake||0); renderAll(); }
+function recalcPot(){ const active= S.seats.filter(id=>S.alive.has(id)).length; S.pot=active*(S.stake||0); renderAll(); }
 
-/* ====== Runde: start/deal ====== */
-function startRoundApply(seed, order, startIdx){
+/* ====== Runde: start/deal (host-only) ====== */
+function startRoundApply(order, startIdx, dealerId){
   S.seats=order.slice(); S.startIdx=startIdx%S.seats.length; S.turnIdx=S.startIdx;
   S.phase='round'; S.passLapCount=0; S.turnStage='idle'; S.selectedIdx=null; S.pending={targetId:null,oppIdx:null,receivedIndex:null};
   clearBotTimer();
   log('🃏 Ny runde – stjæl & byt.');
+  S.localHand=[]; S.hands={}; S.counts={}; S.seats.forEach(id=> S.counts[id]=0);
+  S.alive = new Set(S.seats);
 
-  // Deal: 2 pr. spiller, præcis 1 death i alt
-  const total=S.seats.length*2;
-  const deck=Array(total).fill('life'); deck[rnd(total)]='death';
-  S.hands={}; S.counts={}; S.localHand=[];
-  S.seats.forEach(id=> S.counts[id]=0);
-  for(let i=0;i<S.seats.length;i++){
-    for(let c=0;c<2;c++){
-      const card=deck.splice(rnd(deck.length),1)[0];
-      const id=S.seats[i];
-      if(id===S.me.id) receiveCard(card);
-      else if(S.bots[id]) botReceiveCard(id,card);
-      else sendCardToThief(/*from*/null, id, card);
+  if(S.me.id===dealerId){
+    // Host dealer ENDELIGT (alle andre venter på P2P-kort)
+    const total=S.seats.length*2;
+    const deck=Array(total).fill('life'); deck[rnd(total)]='death';
+
+    for(let i=0;i<S.seats.length;i++){
+      const pid=S.seats[i];
+      for(let c=0;c<2;c++){
+        const card=deck.splice(rnd(deck.length),1)[0];
+        if(pid===S.me.id){ receiveCard(card); }
+        else if(S.bots[pid]){ botReceiveCard(pid,card); }
+        else { sendCardToThief(pid, card); }
+      }
     }
   }
   publish({t:'enableTurn', id:S.seats[S.turnIdx]});
@@ -568,7 +595,6 @@ function startRoundApply(seed, order, startIdx){
 /* ====== Card IO ====== */
 function receiveCard(card){ S.localHand.push(card); S.hands[S.me.id]=S.localHand; S.counts[S.me.id]=(S.counts[S.me.id]||0)+1; renderAll(); }
 function botReceiveCard(id, card){ S.hands[id]=(S.hands[id]||[]); S.hands[id].push(card); S.counts[id]=(S.counts[id]||0)+1; }
-
 function thiefReceiveCard(card){
   const newIdx = S.localHand.length;
   S.localHand.push(card);
@@ -583,7 +609,7 @@ function targetReceiveCard(card, targetId){
   renderAll();
 }
 
-/* ====== Turn flow – my turn ====== */
+/* ====== Turn flow ====== */
 function beginMyTurn(){
   if(S.phase!=='round') return;
   clearBotTimer();
@@ -595,7 +621,7 @@ function chooseOppCardIndex(idx){
   if(!(S.turnStage==='chooseOppCard' && S.pending.targetId)) return;
   S.pending.oppIdx = idx;
   publish({t:'askOppCard', thief:S.me.id, target:S.pending.targetId, idx});
-  log(`Du vælger ${S.presence[S.pending.targetId]?.name||'?'}s ${idx===0?'venstre':'højre'} kort...`);
+  log(`Du vælger ${nameOf(S.pending.targetId)}s ${idx===0?'venstre':'højre'} kort...`);
 }
 function confirmGiveBack(){
   if(!(S.turnStage==='chooseGiveBack' && S.selectedIdx!==null)) return;
@@ -603,19 +629,20 @@ function confirmGiveBack(){
   const give = S.localHand[S.selectedIdx];
   S.localHand.splice(S.selectedIdx,1);
   if(S.pending.receivedIndex > S.selectedIdx) S.pending.receivedIndex--;
-  sendCardToTarget(S.me.id, S.pending.targetId, give);
-  log(`Du gav et kort tilbage til ${S.presence[S.pending.targetId]?.name||'modstander'}.`);
+  sendCardToTarget(S.pending.targetId, give);
+  log(`Du gav et kort tilbage til ${nameOf(S.pending.targetId)}.`);
   S.turnStage='idle'; S.selectedIdx=null; S.pending={targetId:null,oppIdx:null,receivedIndex:null};
   publish({t:'turnDone'});
   renderAll();
 }
+function nameOf(id){ return (S.presence[id]?.name || S.bots[id]?.name || 'spiller'); }
 
-/* ====== Turn flow – events ====== */
+/* ====== Events ====== */
 function onAskOppCard(thiefId, targetId, idx){
   if(S.bots[targetId]){
     const h=S.hands[targetId]||[];
-    const card=h.splice(idx,1)[0];
-    sendCardToThief(targetId, thiefId, card);
+    const card=h.splice(idx,1)[0] ?? 'life';
+    sendCardToThief(thiefId, card);
     publish({t:'gotOppCard', thief:thiefId});
     return;
   }
@@ -623,14 +650,14 @@ function onAskOppCard(thiefId, targetId, idx){
   const h=S.localHand;
   if(!h.length) return;
   const card = h.splice(Math.max(0,Math.min(idx,h.length-1)),1)[0];
-  sendCardToThief(S.me.id, thiefId, card);
-  log(`🔻 ${S.presence[thiefId]?.name||'Spiller'} tog ét af dine kort.`);
+  sendCardToThief(thiefId, card);
+  log(`🔻 ${nameOf(thiefId)} tog ét af dine kort.`);
   renderAll();
   publish({t:'gotOppCard', thief:thiefId});
 }
 function onGotOppCard(thiefId){ /* UI opdateres via p2p (thiefReceiveCard) */ }
 
-/* ====== Advance to next turn & laps ====== */
+/* ====== Next turn & laps ====== */
 function applyTurnAdvance(){
   S.turnIdx=(S.turnIdx+1)%S.seats.length;
 
@@ -649,27 +676,29 @@ function applyTurnAdvance(){
   maybeBotTakeTurn(S.seats[S.turnIdx]);
 }
 
-/* ====== Afsløring / Elimination ====== */
+/* ====== Reveal / Elimination (host only) ====== */
 function doReveal(){
-  if(S.phase!=='reveal') return;
-  clearBotTimer();
-  if((S.hands[S.me.id]||S.localHand).includes('death')) publish({t:'elim', id:S.me.id});
-  Object.keys(S.bots).forEach(id=>{ if((S.hands[id]||[]).includes('death')) publish({t:'elim', id}); });
+  if(!S.isHost || S.phase!=='reveal') return;
+  // Host afgør hvem der har death
+  for(const id of S.seats){
+    const hand = (id===S.me.id)? S.localHand : (S.hands[id]||[]);
+    if(hand.includes('death')) publish({t:'elim', id});
+  }
 }
 function eliminate(id){
   if(!S.alive.has(id)) return;
   S.alive.delete(id);
-  log(`☠️ ${S.presence[id]?.name||id} er ude (Death).`);
+  log(`☠️ ${nameOf(id)} er ude (Death).`);
   const alive=Array.from(S.alive);
   if(alive.length===1) publish({t:'end', winner:alive[0]});
-  else if(alive.length===2) publish({t:'final', seed:crypto.randomUUID(), first:alive[rnd(2)]});
+  else if(alive.length===2) publish({t:'final', first:alive[rnd(2)]});
   else { S.phase='lobby'; log('Værten kan starte næste runde.'); }
   recalcPot(); renderAll();
 }
 
 /* ====== Finale ====== */
 let F={deck:[], face:[], turn:null};
-function startFinal(seed, first){
+function startFinal(first){
   S.phase='final'; renderAll(); clearBotTimer(); log('🏁 Finale! 8 kort i cirkel.');
   F.deck=Array(8).fill('life'); F.deck[rnd(8)]='death'; F.face=Array(8).fill(false); F.turn=first;
   if(F.turn===S.me.id) finalPickPrompt(); else if(S.bots[F.turn]) botFinalPick(F.turn);
@@ -677,12 +706,12 @@ function startFinal(seed, first){
 function finalPickPrompt(){ const s=prompt('Finale: vælg felt 1–8'); const idx=Math.max(1,Math.min(8,parseInt(s||'1',10)))-1; const card=F.deck[idx]; publish({t:'finalPick', id:S.me.id, idx, card}); }
 function finalApplyPick(id, idx, card){
   if(F.face[idx]) return; F.face[idx]=true;
-  log(`🎲 ${S.presence[id]?.name||id} trak ${card==='death'?'DEATH':'Life'}.`);
+  log(`🎲 ${nameOf(id)} trak ${card==='death'?'DEATH':'Life'}.`);
   if(card==='death'){ const loser=id; const alive=Array.from(S.alive); const winner=alive.find(x=>x!==loser)||S.me.id; publish({t:'end',winner}); return; }
   const alive=Array.from(S.alive); const other=alive.find(x=>x!==id);
   F.turn=other; if(other===S.me.id) finalPickPrompt(); else if(S.bots[other]) botFinalPick(other);
 }
-function endGame(winner){ S.phase='end'; renderAll(); clearBotTimer(); const name=S.presence[winner]?.name||'Ukendt'; log(`🏆 ${name} vinder og tager ${S.pot} guld!`); alert(`${name} vinder ${S.pot} guld!`); }
+function endGame(winner){ S.phase='end'; renderAll(); clearBotTimer(); const name=nameOf(winner); log(`🏆 ${name} vinder og tager ${S.pot} guld!`); alert(`${name} vinder ${S.pot} guld!`); }
 
 /* ====== Bots ====== */
 function clearBotTimer(){ if(S.botTimer){ clearTimeout(S.botTimer); S.botTimer=null; } }
@@ -697,12 +726,11 @@ function maybeBotTakeTurn(id){
     const thand = S.hands[target]||[];
     const taken = thand.splice(idx,1)[0] || (Math.random()<0.125?'death':'life');
     const my = S.hands[id]||[];
-    let giveIdx = my.findIndex(c=>c==='death');
-    if(giveIdx<0) giveIdx = 0;
+    let giveIdx = my.findIndex(c=>c==='death'); if(giveIdx<0) giveIdx = 0;
     const give = my.splice(giveIdx,1)[0] || 'life';
     my.push(taken); S.hands[id]=my;
     const tgt = S.hands[target]||[]; tgt.push(give); S.hands[target]=tgt;
-    log(`🤖 ${S.presence[id]?.name||'NPC'} byttede med ${S.presence[target]?.name||'spiller'}.`);
+    log(`🤖 ${nameOf(id)} byttede med ${nameOf(target)}.`);
     publish({t:'turnDone'});
   }, 650+rnd(900));
 }
