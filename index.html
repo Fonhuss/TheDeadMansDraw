@@ -58,6 +58,7 @@
   </header>
 
   <section class="grid xl:grid-cols-4 gap-4 mb-5">
+    <!-- Opsætning -->
     <div class="xl:col-span-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
       <h2 class="font-semibold mb-2">Spilopsætning</h2>
 
@@ -116,6 +117,7 @@
       </div>
     </div>
 
+    <!-- Sidepanel -->
     <aside class="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 rules">
       <div class="flex items-center justify-between">
         <h3 class="font-semibold">Regler – “Stjæl & Byt”</h3>
@@ -142,6 +144,7 @@
     </aside>
   </section>
 
+  <!-- Bord -->
   <section class="rounded-3xl wood p-6">
     <div class="circle" id="table"></div>
     <div class="mt-3 flex flex-wrap items-center gap-2 sm:hidden">
@@ -269,7 +272,7 @@ async function join(code, asHost){
 
     S.channel.on('presence',{event:'sync'},()=>{
       const st=S.channel.presenceState(); const list=Object.values(st).flat().map(p=>p.meta);
-      for(const p of list){ S.presence[p.id]={id:p.id,name:p.name,host:!!p.host}; }
+      for(const p of list){ S.presence[p.id]={id:p.id,name:p.name,host:!!p.host, seatAck: S.presence[p.id]?.seatAck||false}; }
       renderAll();
       log('👥 Presence sync: ' + list.map(p=>p.name).join(', '));
       if(S.isHost){ assignMissingSeats(activeNames); }
@@ -278,12 +281,28 @@ async function join(code, asHost){
     S.channel.on('broadcast',{event:'public'},({payload})=> onPublic(payload));
     S.channel.on('broadcast',{event:'signal'},({payload})=> onSignal(payload));
 
-    const { error: subErr } = await S.channel.subscribe();
-    if (subErr) { console.error(subErr); log('❌ Realtime subscribe fejlede: ' + subErr.message); return; }
-    log('✅ Realtime SUBSCRIBED – tracker dig i rummet...');
+    // subscribe (VENT og log alt)
+    const { error: subErr } = await S.channel.subscribe((status) => {
+      log(`🔄 Realtime status: ${status}`);
+    });
+    if (subErr) {
+      console.error(subErr);
+      log('❌ SUBSCRIBE FEJLEDE: ' + subErr.message);
+      alert('Realtime subscribe fejlede. Tjek internet/HTTPS/CORS.');
+      return;
+    }
+
     const { error: trackErr } = await S.channel.track({ id:S.me.id, name:myName, host:S.isHost });
-    if (trackErr) { console.error(trackErr); log('❌ Presence track fejlede: ' + trackErr.message); }
-    const rt = $('#ui-rt'); if(rt) rt.textContent = 'Tilsluttet';
+    if (trackErr) {
+      console.error(trackErr);
+      log('❌ TRACK FEJLEDE: ' + trackErr.message);
+    } else {
+      log('✅ TRACK OK – du er synlig for andre.');
+    }
+    const rt = $('#ui-rt'); if (rt) rt.textContent = 'Tilsluttet';
+
+    // Ping til rummet så host ser dig i loggen
+    publish({ t:'info', m:`📡 ${myName} siger hej!` });
 
     // Host: initial seatmap
     if(S.isHost){
@@ -307,14 +326,14 @@ async function join(code, asHost){
     S.seats=[S.me.id];
     for(let i=1;i<activeNames.length;i++){ const npcId=crypto.randomUUID(); S.seats.push(npcId); S.bots[npcId]={isBot:true,name:activeNames[i]}; }
     S.alive = new Set(S.seats);
-    S.presence[S.me.id]={id:S.me.id,name:myName,host:true};
+    S.presence[S.me.id]={id:S.me.id,name:myName,host:true,seatAck:true};
     renderAll();
   }
 
   recalcPot();
 }
 
-/* ====== Seatmap – host autoritet ====== */
+/* ====== Seatmap – host autoritet + ack-loop ====== */
 function assignMissingSeats(activeNames){
   const presentIds = Object.keys(S.presence);
   const unknown = presentIds.filter(id => !S.seats.includes(id) && !S.bots[id]);
@@ -337,6 +356,7 @@ function assignMissingSeats(activeNames){
 }
 function broadcastSeatmap(){
   publish({t:'seatmap', seats:S.seats, bots: Object.fromEntries(Object.entries(S.bots).map(([id,b])=>[id,{name:b.name}]))});
+
   // send direkte "du sidder på index X" til hver menneske-klient
   if(S.useNet){
     for(const id of S.seats){
@@ -347,6 +367,23 @@ function broadcastSeatmap(){
     }
   }
   renderAll();
+
+  // Ack-loop: host genudsender seatmap indtil alle har kvitteret
+  if (S.isHost) {
+    let tries = 0;
+    const ackTimer = setInterval(() => {
+      tries++;
+      const humans = S.seats.filter(id => S.presence[id]);
+      const missing = humans.filter(id => !S.presence[id]?.seatAck);
+      if (missing.length === 0 || tries > 10) { clearInterval(ackTimer); return; }
+      log('↻ Venter på seat-ack fra: ' + missing.map(id => S.presence[id]?.name || id).join(', '));
+      publish({t:'seatmap', seats:S.seats, bots: Object.fromEntries(Object.entries(S.bots).map(([id,b])=>[id,{name:b.name}]))});
+      for(const id of missing){
+        const idx = S.seats.indexOf(id);
+        S.channel.send({type:'broadcast', event:'signal', payload:{ from:S.me.id, to:id, data:{ type:'seatAssign', index: idx } }});
+      }
+    }, 3000);
+  }
 }
 
 /* ====== Broadcast routing ====== */
@@ -380,10 +417,29 @@ function onPublic(msg){
 function onSignal({from,to,data}){
   if(!S.useNet) return;
 
-  // DM payloads: direkte kort / seatAssign
-  if(to===S.me.id && data?.type==='cardToThief'){ thiefReceiveCard(data.card); return; }
-  if(to===S.me.id && data?.type==='cardToTarget'){ targetReceiveCard(data.card, data.target); return; }
-  if(to===S.me.id && data?.type==='seatAssign'){ log(`🪑 Du er placeret på sæde ${data.index+1}.`); return; }
+  // DM payloads: direkte kort / seatAssign / seatAck
+  if (to===S.me.id && data?.type==='seatAssign') {
+    const idx = data.index;
+    if (S.useNet && S.channel) {
+      S.channel.send({ type:'broadcast', event:'signal', payload:{ from:S.me.id, to:null, data:{ type:'seatAck', who:S.me.id, index:idx } }});
+    }
+    log(`🪑 Du er placeret på sæde ${idx+1}.`);
+    return;
+  }
+  if (to===S.me.id && data?.type==='seatAck') {
+    if (S.isHost && S.presence[data.who]) S.presence[data.who].seatAck = true;
+    return;
+  }
+  if (to===S.me.id && data?.type==='cardToThief') {
+    log('📬 Modtog kort (DM fallback) → thief');
+    thiefReceiveCard(data.card);
+    return;
+  }
+  if (to===S.me.id && data?.type==='cardToTarget') {
+    log('📬 Modtog kort (DM fallback) → target');
+    targetReceiveCard(data.card, data.target);
+    return;
+  }
 
   // WebRTC signaler (for P2P)
   if(to && to!==S.me.id) return; // ikke til mig
@@ -546,7 +602,7 @@ function renderTable(){
         bar.className='mt-2 flex gap-2';
         const btn = document.createElement('button');
         btn.className='px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50';
-        btn.textContent='Byt nu';
+        btn.textContent = 'Byt nu';
         btn.disabled = (S.selectedIdx===null);
         btn.onclick = confirmGiveBack;
         bar.appendChild(btn);
@@ -570,6 +626,7 @@ function renderTable(){
               if(id===S.me.id) return;
               S.pending.targetId = id;
               S.turnStage = 'chooseOppCard';
+              // lille micro-tick så click ikke sluges ved state-skift
               setTimeout(()=> chooseOppCardIndex(k), 0);
             };
           } else if(S.turnStage==='chooseOppCard' && S.pending.targetId===id){
@@ -602,6 +659,7 @@ function startRoundApply(order, startIdx, dealerId){
 
   if(S.me.id===dealerId){
     publish({t:'info', m:'🂠 Host deler kort...'});
+    log('🂠 Deler kort (host). P2P eller DM-fallback bruges pr. spiller.');
     const total=S.seats.length*2;
     const deck=Array(total).fill('life'); deck[rnd(total)]='death';
 
@@ -763,6 +821,9 @@ function maybeBotTakeTurn(id){
 
 /* ====== Misc ====== */
 function setupNames(){ S.me.name=$('#my-name').value||'DM'; }
+
+// Auto-init net (hjælper hvis man glemmer at trykke)
+window.addEventListener('load', () => { try { $('#init').click(); } catch {} });
 </script>
 </body>
 </html>
