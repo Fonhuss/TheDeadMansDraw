@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>The Dead Man’s Draw – D&D Tavern (1–4p + NPCs)</title>
+<title>The Dead Man’s Draw – D&D Tavern (Steal & Swap)</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   .tavern{background:
@@ -15,7 +15,7 @@
     repeating-conic-gradient(from 0deg,#5d3a1a 0 10deg,#6f4621 10deg 20deg);
     border:8px solid #3d2a13;box-shadow:0 0 40px rgba(0,0,0,.6) inset,0 10px 30px rgba(0,0,0,.6)}
   .circle{position:relative;width:520px;height:520px;border-radius:50%;margin:0 auto}
-  .seat{position:absolute;width:120px;height:120px;transform:translate(-50%,-50%)}
+  .seat{position:absolute;width:140px;height:140px;transform:translate(-50%,-50%)}
   .card{width:48px;height:70px;border-radius:8px;border:2px solid rgba(0,0,0,.6);
     box-shadow:0 2px 8px rgba(0,0,0,.5);background:linear-gradient(135deg,#222,#333);
     transition:transform .12s ease, box-shadow .12s ease, outline .12s ease; cursor:default}
@@ -23,12 +23,14 @@
   .life{background:linear-gradient(135deg,#164e63,#0e7490)!important}
   .death{background:linear-gradient(135deg,#3f1d1d,#7f1d1d)!important}
   .selected{outline:3px solid #fbbf24; box-shadow:0 0 18px rgba(251,191,36,.55)}
+  .targetable{outline:2px dashed #60a5fa}
   .token{width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#ffe38a,#b88700);
     border:2px solid #4a3406;box-shadow:0 1px 6px rgba(0,0,0,.6);display:inline-flex;align-items:center;justify-content:center;
     font-weight:700;font-size:12px;color:#3a2a02}
   .scrollbox{scrollbar-color:#334155 transparent}
   .rules a{color:#93c5fd;text-decoration:underline}
-  @media (max-width:640px){.circle{width:92vw;height:92vw}.seat{width:28vw;height:28vw}.card{width:10vw;height:14vw}}
+  .pill{display:inline-block;padding:.2rem .5rem;border-radius:9999px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:.75rem}
+  @media (max-width:640px){.circle{width:92vw;height:92vw}.seat{width:30vw;height:30vw}.card{width:10vw;height:14vw}}
 </style>
 </head>
 <body class="tavern text-slate-100">
@@ -36,7 +38,7 @@
   <header class="mb-4 md:mb-6 flex items-center justify-between gap-3">
     <div>
       <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight">The Dead Man’s Draw <span class="text-amber-400">– D&D Tavern</span></h1>
-      <p class="text-slate-300 text-sm md:text-base">1–4 spillere, NPC-bots, potte, online/lokalt. Undgå <span class="text-rose-400 font-semibold">Death</span>.</p>
+      <p class="text-slate-300 text-sm md:text-base">“Stjæl & Byt” • 1–4 spillere, NPC-bots, online/lokalt • Undgå <span class="text-rose-400 font-semibold">Death</span>.</p>
     </div>
     <div class="hidden sm:flex items-center gap-3">
       <div class="token" id="pot-badge">0</div><span class="text-xs text-slate-400">guld i potten</span>
@@ -78,7 +80,7 @@
             <input id="pass-rounds" type="number" min="1" max="10" value="1" class="w-28 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700" />
             <button id="set-pass" class="px-3 py-2 rounded-xl bg-sky-700 hover:bg-sky-600">Gem</button>
           </div>
-          <p class="text-xs text-slate-400 mt-1">Runden afsløres efter så mange fulde omgange.</p>
+          <p class="text-xs text-slate-400 mt-1">Afslør efter så mange <em>hele</em> omgange (alle har haft tur).</p>
         </div>
       </div>
 
@@ -88,7 +90,8 @@
         <input id="room" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700" placeholder="RUMKODE" />
         <button id="join" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500">Join</button>
         <span class="text-xs text-slate-400 self-center">Rum: <span id="ui-room" class="font-mono">—</span></span>
-        <span class="text-xs text-slate-400 self-center">Fase: <span id="ui-phase" class="px-2 py-1 rounded-full bg-slate-800 border border-slate-700">Lobby</span></span>
+        <span class="text-xs text-slate-400 self-center">Fase: <span id="ui-phase" class="pill">Lobby</span></span>
+        <span class="text-xs text-slate-400 self-center">Turfase: <span id="ui-turn" class="pill">—</span></span>
       </div>
 
       <div class="mt-3 flex flex-wrap gap-2 items-center">
@@ -96,24 +99,23 @@
         <button id="reveal" class="px-3 py-2 rounded-xl bg-rose-700 hover:bg-rose-600">Afslør & eliminer</button>
         <button id="force-final" class="px-3 py-2 rounded-xl bg-fuchsia-700 hover:bg-fuchsia-600">Tving finale (1v1)</button>
 
-        <button id="confirm-pass" class="ml-auto px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50" disabled>Bekræft valgt kort ➜ venstre</button>
+        <button id="confirm-swap" class="ml-auto px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50" disabled>Byt: giv valgt kort tilbage</button>
         <button id="show-hand" class="px-3 py-2 rounded-xl bg-slate-700">Se mine kort</button>
       </div>
     </div>
 
-    <!-- Sidepanel: Regler + Log (begge kollapset fra start) -->
+    <!-- Sidepanel: Regler + Log (kollapset fra start) + Spillere -->
     <aside class="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 rules">
       <div class="flex items-center justify-between">
-        <h3 class="font-semibold">Regler – “The Dead Man’s Draw”</h3>
+        <h3 class="font-semibold">Regler – “Stjæl & Byt”</h3>
         <button id="toggle-rules" class="text-xs px-2 py-1 rounded-lg bg-slate-800 border border-slate-700">Vis</button>
       </div>
       <div id="rules-body" class="hidden mt-2 text-xs leading-5 space-y-2">
         <p><strong>Formål:</strong> Undgå <span class="text-rose-400 font-semibold">Death</span>. Sidste spiller uden Death vinder potten.</p>
-        <p><strong>Opsætning:</strong> 8 kort totalt – 1× Death, 7× Life. Hver spiller får 2 kort. Alle lægger indsats i potten.</p>
-        <p><strong>Runde:</strong> Startspiller vælger ét af sine kort og giver <em>venstre</em>. Turen går rundt bordet. Når en fuld omgang er gennemført, tælles det som <em>1 pass-runde</em>. DM sætter hvor mange pass-runder der spilles.</p>
-        <p><strong>Afsløring:</strong> Når antal pass-runder er spillet, vender alle kort. Spilleren med Death er <em>ude</em>. Potten bliver stående.</p>
-        <p><strong>Finale (1v1):</strong> 8 kort i cirkel (nedad). Spillerne trækker på skift. Den der trækker Death taber; den anden vinder potten.</p>
-        <p><strong>Taverneregler (valgfrit):</strong> Bluff, side-bets, drikkeregler, magiske variationer.</p>
+        <p><strong>Opsætning:</strong> 8 kort – 1× Death, 7× Life. Alle får 2 kort. Indsats i potten.</p>
+        <p><strong>Tur:</strong> Vælg en modstander → vælg deres venstre/højre <em>ukendte</em> kort → du modtager det → vælg ét af dine <em>oprindelige</em> kort at give tilbage (ikke det du lige tog). Begge ender på 2 kort.</p>
+        <p><strong>Omgange:</strong> Når alle har haft tur = 1 omgang. Efter det valgte antal omgange afsløres, spilleren med Death er ude.</p>
+        <p><strong>Finale (1v1):</strong> 8 nedadvendte kort i cirkel. Træk på skift; den der trækker Death taber.</p>
       </div>
 
       <div class="mt-4 flex items-center justify-between">
@@ -156,83 +158,72 @@ const rnd = (n)=>Math.floor(Math.random()*n);
 
 /* ====== State ====== */
 const S = {
-  useNet: true,
-  sb:null, channel:null, room:null, isHost:false,
+  useNet:true, sb:null, channel:null, room:null, isHost:false,
   me:{ id: crypto.randomUUID(), name:'' },
   presence:{}, peers:new Map(),
   phase:'lobby',
   seats:[], alive:new Set(), startIdx:0, turnIdx:0,
   hands:{}, counts:{}, localHand:[],
-  stake:10, pot:0, modePlayers:4,
-  bots:{},
+  stake:10, pot:0, modePlayers:4, bots:{},
 
-  passTarget: 1,
-  passLapCount: 0,
+  passTarget:1, passLapCount:0,
 
-  selectedIdx: null
+  // Steal & swap UI-state
+  turnStage:'idle', // 'chooseTarget' | 'chooseOppCard' | 'chooseGiveBack' | 'idle'
+  pending:{ targetId:null, oppIdx:null, receivedIndex:null },
+
+  selectedIdx:null // used in chooseGiveBack to pick which of *your original* cards to give back
 };
 const DEFAULT_NPCS = ["Barkeep Borin","Sable the Cutpurse","Priestess Kael","Old Man Rook","Garruk the Smith","Nina Nightjar","Sir Thorne","Mina Quickstep","Vex the Bard","Hilda Ember","Karn Ironjaw","Willow Whisper"];
 
 /* ====== UI wiring ====== */
-const namesWrap = $('#names'), table = $('#table'), playersList = $('#players');
-const potBadge = $('#pot-badge'), potBadgeSm = $('#pot-badge-sm');
-const tabs = [...document.querySelectorAll('.tab')];
-tabs.forEach(b=> b.onclick = ()=> setMode(parseInt(b.dataset.p,10)));
+const namesWrap=$('#names'), table=$('#table'), playersList=$('#players');
+const potBadge=$('#pot-badge'), potBadgeSm=$('#pot-badge-sm');
+
+const tabs=[...document.querySelectorAll('.tab')];
+tabs.forEach(b=> b.onclick=()=> setMode(parseInt(b.dataset.p,10)));
 $('#fill-npc').onchange = renderNameInputs;
 $('#use-net').onchange  = e => S.useNet = e.target.checked;
 $('#my-name').oninput   = renderNameInputs;
 
-// Regler: kollaps/udvid
+// Collapsers
 $('#toggle-rules').onclick = ()=>{
   const body=$('#rules-body'); const btn=$('#toggle-rules');
   if(body.classList.contains('hidden')){ body.classList.remove('hidden'); btn.textContent='Skjul'; }
   else { body.classList.add('hidden'); btn.textContent='Vis'; }
 };
-// Log: kollaps/udvid
-const logWrapEl = $('#log-wrap');
-const toggleLogBtn = $('#toggle-log');
+const logWrapEl = $('#log-wrap'); const toggleLogBtn = $('#toggle-log');
 toggleLogBtn.onclick = ()=>{
-  if (logWrapEl.classList.contains('hidden')) {
-    logWrapEl.classList.remove('hidden');
-    toggleLogBtn.textContent = 'Skjul';
-  } else {
-    logWrapEl.classList.add('hidden');
-    toggleLogBtn.textContent = 'Vis';
-  }
+  if (logWrapEl.classList.contains('hidden')) { logWrapEl.classList.remove('hidden'); toggleLogBtn.textContent='Skjul'; }
+  else { logWrapEl.classList.add('hidden'); toggleLogBtn.textContent='Vis'; }
 };
 
-function setMode(p){
-  S.modePlayers = p;
-  tabs.forEach(b=> b.classList.toggle('bg-emerald-700', parseInt(b.dataset.p,10)===p));
-  renderNameInputs();
-}
+function setMode(p){ S.modePlayers=p; tabs.forEach(b=> b.classList.toggle('bg-emerald-700', parseInt(b.dataset.p,10)===p)); renderNameInputs(); }
 function renderNameInputs(){
-  namesWrap.innerHTML = '';
-  const p = S.modePlayers, fillNPC = $('#fill-npc').checked;
+  namesWrap.innerHTML=''; const p=S.modePlayers, fillNPC=$('#fill-npc').checked;
   for(let i=0;i<4;i++){
-    const npc = i>=p && fillNPC;
-    const div = document.createElement('div');
-    div.innerHTML = `
-      <label class="text-sm">${i<p?`Spiller ${i+1}`:`Sæde ${i+1}`}${npc?' (NPC)':''}</label>
-      <input data-seat="${i}" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 seat-name"
-             placeholder="${npc? DEFAULT_NPCS[i%DEFAULT_NPCS.length] : 'Navn'}"
-             value="${i===0?($('#my-name').value||''):''}">
-    `;
-    namesWrap.appendChild(div);
+    const npc=i>=p && fillNPC;
+    namesWrap.insertAdjacentHTML('beforeend',`
+      <div>
+        <label class="text-sm">${i<p?`Spiller ${i+1}`:`Sæde ${i+1}`}${npc?' (NPC)':''}</label>
+        <input data-seat="${i}" class="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 seat-name"
+               placeholder="${npc? DEFAULT_NPCS[i%DEFAULT_NPCS.length] : 'Navn'}"
+               value="${i===0?($('#my-name').value||''):''}">
+      </div>`);
   }
 }
 setMode(4);
 
 /* ====== Supabase init ====== */
 let supabase;
-$('#init').onclick = ()=>{
+$('#init').onclick=()=>{
   if(!S.useNet){ log('🔌 Offline/solo – springer Supabase over.'); return; }
-  supabase = createClient(SUPABASE_URL, SUPABASE_ANON, { realtime:{ params:{ eventsPerSecond:5 } } });
-  S.sb = supabase; log('✅ Supabase klar.');
+  supabase=createClient(SUPABASE_URL,SUPABASE_ANON,{realtime:{params:{eventsPerSecond:5}}});
+  S.sb=supabase; log('✅ Supabase klar.');
 };
 
-$('#make').onclick = async ()=>{ await ensureNetIfWanted(); setupNames(); const code = makeRoom(); $('#room').value=code; await join(code,true); };
-$('#join').onclick = async ()=>{ await ensureNetIfWanted(); setupNames(); const code = ($('#room').value||'').trim().toUpperCase(); if(!code) return alert('Rumkode?'); await join(code,false); };
+$('#make').onclick = async ()=>{ await ensureNetIfWanted(); setupNames(); const code=makeRoom(); $('#room').value=code; await join(code,true); };
+$('#join').onclick = async ()=>{ await ensureNetIfWanted(); setupNames(); const code=($('#room').value||'').trim().toUpperCase(); if(!code) return alert('Rumkode?'); await join(code,false); };
 
 $('#set-stake').onclick = ()=> publish({t:'stake', v: Math.max(0, parseInt($('#stake').value||'10',10))});
 $('#set-pass').onclick  = ()=> publish({t:'passTarget', v: Math.max(1, Math.min(10, parseInt($('#pass-rounds').value||'1',10)))});
@@ -241,137 +232,140 @@ $('#set-pass').onclick  = ()=> publish({t:'passTarget', v: Math.max(1, Math.min(
 async function ensureNetIfWanted(){ if(!S.useNet) return; if(!S.sb) $('#init').click(); if(!S.sb) throw new Error('Supabase ikke initialiseret'); }
 function makeRoom(){ const chars='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<5;i++) s+=chars[rnd(chars.length)]; return s; }
 
-/* ====== join – bind sæde 0 til dit ID, lav bots og presence ====== */
+/* ====== Join (presence + bots) ====== */
 async function join(code, asHost){
-  S.room = code; S.isHost = !!asHost; $('#ui-room').textContent = code;
+  S.room=code; S.isHost=!!asHost; $('#ui-room').textContent=code;
+  S.alive=new Set(); S.bots={}; S.presence={}; S.localHand=[]; S.selectedIdx=null; S.turnStage='idle'; S.pending={targetId:null,oppIdx:null,receivedIndex:null};
 
-  S.alive = new Set(); S.bots = {}; S.presence = {}; S.localHand=[]; S.selectedIdx=null;
-
-  const seatInputs = [...document.querySelectorAll('.seat-name')];
-  const inputNames = seatInputs.map((el,i)=> (el.value || el.placeholder || `Sæde ${i+1}`));
-  const p = S.modePlayers; const fillNPC = $('#fill-npc').checked;
-
-  const activeNames = [];
-  for(let i=0;i<4;i++){
-    if(i<p) activeNames.push(inputNames[i] || `Spiller ${i+1}`);
-    else if(fillNPC) activeNames.push(inputNames[i] || DEFAULT_NPCS[i%DEFAULT_NPCS.length]);
-  }
+  const seatInputs=[...document.querySelectorAll('.seat-name')];
+  const inputNames = seatInputs.map((el,i)=> (el.value||el.placeholder||`Sæde ${i+1}`));
+  const p=S.modePlayers, fillNPC=$('#fill-npc').checked;
+  const activeNames=[];
+  for(let i=0;i<4;i++){ if(i<p) activeNames.push(inputNames[i]||`Spiller ${i+1}`); else if(fillNPC) activeNames.push(inputNames[i]||DEFAULT_NPCS[i%DEFAULT_NPCS.length]); }
 
   S.seats = activeNames.map(()=> crypto.randomUUID());
-  if(S.seats.length===0) S.seats = [crypto.randomUUID()];
-  S.seats[0] = S.me.id; // dig
+  if(S.seats.length===0) S.seats=[crypto.randomUUID()];
+  S.seats[0]=S.me.id;
 
-  const myName = $('#my-name').value || 'DM';
-  S.me.name = myName;
-  S.presence[S.me.id] = { id:S.me.id, name:myName, host:S.isHost };
-  S.alive.add(S.me.id);
-
+  const myName=$('#my-name').value||'DM'; S.me.name=myName;
+  S.presence[S.me.id]={id:S.me.id,name:myName,host:S.isHost}; S.alive.add(S.me.id);
   for(let i=1;i<S.seats.length;i++){
-    const id = S.seats[i];
-    const nm = activeNames[i] || DEFAULT_NPCS[i%DEFAULT_NPCS.length];
-    S.presence[id] = { id, name:nm, host:false };
-    S.alive.add(id);
-    if(i >= p){ S.bots[id] = { isBot:true, name:nm, style:'normal' }; }
+    const id=S.seats[i]; const nm=activeNames[i]||DEFAULT_NPCS[i%DEFAULT_NPCS.length];
+    S.presence[id]={id,name:nm,host:false}; S.alive.add(id);
+    if(i>=p){ S.bots[id]={isBot:true,name:nm,style:'normal'}; }
   }
 
-  renderPlayers(); recalcPot();
+  renderAll(); recalcPot();
 
   if(S.useNet){
     if(!S.sb) $('#init').click();
-    S.channel = S.sb.channel(`tavern-${code}`, { config:{ broadcast:{ self:true }, presence:{ key:S.me.id } } });
-
-    S.channel.on('presence', {event:'sync'}, ()=>{
+    S.channel=S.sb.channel(`tavern-${code}`,{config:{broadcast:{self:true},presence:{key:S.me.id}}});
+    S.channel.on('presence',{event:'sync'},()=>{
       const st=S.channel.presenceState(); const list=Object.values(st).flat().map(p=>p.meta);
-      for(const p of list){ S.presence[p.id] = { id:p.id, name:p.name, host:!!p.host }; }
-      renderPlayers(); recalcPot();
+      for(const p of list){ S.presence[p.id]={id:p.id,name:p.name,host:!!p.host}; }
+      renderAll(); recalcPot();
     });
     S.channel.on('broadcast',{event:'public'},({payload})=> onPublic(payload));
     S.channel.on('broadcast',{event:'signal'},({payload})=> onSignal(payload));
-
     await S.channel.subscribe(async status=>{
       if(status!=='SUBSCRIBED') return;
-      await S.channel.track({ id:S.me.id, name:myName, host:S.isHost });
+      await S.channel.track({id:S.me.id,name:myName,host:S.isHost});
       log(`Du er ${myName}${S.isHost?' (host)':''}. Del rumkode: ${S.room}`);
-      if(S.isHost){ publish({t:'info', m:`Sæder: ${activeNames.join(', ')}`}); publish({t:'passTarget', v:S.passTarget}); publish({t:'stake', v:S.stake}); }
+      if(S.isHost){ publish({t:'info',m:`Sæder: ${activeNames.join(', ')}`}); publish({t:'passTarget',v:S.passTarget}); publish({t:'stake',v:S.stake}); }
     });
-  } else {
-    log('🔌 Offline/solo–mode.');
-  }
+  } else { log('🔌 Offline/solo–mode.'); }
 }
 
 /* ====== Broadcast routing ====== */
-function publish(payload){ if(S.useNet) S.channel.send({ type:'broadcast', event:'public', payload }); else onPublic(payload); }
+function publish(payload){ if(S.useNet) S.channel.send({type:'broadcast',event:'public',payload}); else onPublic(payload); }
 function onPublic(msg){
   if(msg.t==='stake'){ S.stake=msg.v; recalcPot(); log(`Indsats: ${S.stake} guld`); }
-  if(msg.t==='passTarget'){ S.passTarget = Math.max(1, Math.min(10, msg.v|0)); $('#pass-rounds').value = S.passTarget; log(`Pass-runder pr. runde: ${S.passTarget}`); }
+  if(msg.t==='passTarget'){ S.passTarget=Math.max(1,Math.min(10,msg.v|0)); $('#pass-rounds').value=S.passTarget; log(`Pass-runder pr. runde: ${S.passTarget}`); }
   if(msg.t==='startRound'){ startRoundApply(msg.seed, msg.order, msg.startIdx); }
-  if(msg.t==='enableTurn'){ if(msg.id===S.me.id) enableTurn(); else maybeBotTakeTurn(msg.id); }
-  if(msg.t==='turn'){ applyTurn(msg.from, msg.to); }
+  if(msg.t==='enableTurn'){ if(msg.id===S.me.id) beginMyTurn(); else maybeBotTakeTurn(msg.id); }
+  if(msg.t==='askOppCard'){ onAskOppCard(msg.thief, msg.target, msg.idx); }
+  if(msg.t==='gotOppCard'){ onGotOppCard(msg.thief); }
+  if(msg.t==='turnDone'){ applyTurnAdvance(); }
   if(msg.t==='reveal'){ doReveal(); }
   if(msg.t==='elim'){ eliminate(msg.id); }
   if(msg.t==='final'){ startFinal(msg.seed, msg.first); }
   if(msg.t==='finalPick'){ finalApplyPick(msg.id, msg.idx, msg.card); }
   if(msg.t==='end'){ endGame(msg.winner); }
   if(msg.t==='info'){ log(msg.m); }
-  renderPlayers();
+  renderAll();
 }
 
-/* ====== P2P til hemmelige kort (kun online) ====== */
+/* ====== P2P for hemmelige kort ====== */
 async function ensurePeer(otherId, initiator){
   if(S.peers.has(otherId)) return S.peers.get(otherId);
-  const p = new Peer({ initiator, trickle:false });
-  p.on('signal',data=> S.channel.send({ type:'broadcast', event:'signal', payload:{from:S.me.id,to:otherId,data} }));
-  p.on('connect',()=> log(`🔗 P2P ${S.presence[otherId]?.name||otherId}`));
-  p.on('error',e=>console.warn('peer',e)); p.on('close',()=>S.peers.delete(otherId));
-  p.on('data',buf=>{ try{ const m=JSON.parse(buf.toString()); if(m.t==='card') receiveCard(m.card); }catch(e){} });
+  const p=new Peer({initiator, trickle:false});
+  p.on('signal',data=> S.channel.send({type:'broadcast',event:'signal',payload:{from:S.me.id,to:otherId,data}}));
+  p.on('data',buf=>{ try{ const m=JSON.parse(buf.toString()); if(m.t==='cardToThief') thiefReceiveCard(m.card); if(m.t==='cardToTarget') targetReceiveCard(m.card, m.target); }catch(e){} });
+  p.on('error',e=>console.warn(e)); p.on('close',()=>S.peers.delete(otherId));
   S.peers.set(otherId,p);
-  if(!initiator){ S.channel.send({ type:'broadcast', event:'signal', payload:{from:S.me.id,to:null,data:{type:'hello'}}}); }
+  if(!initiator) S.channel.send({type:'broadcast',event:'signal',payload:{from:S.me.id,to:null,data:{type:'hello'}}});
   return p;
 }
 function onSignal({from,to,data}){
   if(!S.useNet) return;
   if(data?.type==='hello' && S.isHost){ ensurePeer(from,true); return; }
   if(to && to!==S.me.id) return;
-  let p = S.peers.get(from);
+  let p=S.peers.get(from);
   if(!p){
     p=new Peer({initiator:false,trickle:false});
-    p.on('signal',d=> S.channel.send({ type:'broadcast', event:'signal', payload:{from:S.me.id,to:from,data:d} }));
-    p.on('connect',()=>log(`🔗 P2P ${S.presence[from]?.name||from}`));
+    p.on('signal',d=> S.channel.send({type:'broadcast',event:'signal',payload:{from:S.me.id,to:from,data:d}}));
+    p.on('data',buf=>{ try{ const m=JSON.parse(buf.toString()); if(m.t==='cardToThief') thiefReceiveCard(m.card); if(m.t==='cardToTarget') targetReceiveCard(m.card, m.target); }catch(e){} });
     p.on('error',e=>console.warn(e)); p.on('close',()=>S.peers.delete(from));
-    p.on('data',buf=>{ try{ const m=JSON.parse(buf.toString()); if(m.t==='card') receiveCard(m.card); }catch(e){} });
     S.peers.set(from,p);
   }
   try{ p.signal(data); }catch(e){}
 }
-async function sendSecret(toId, card){
-  if(!S.useNet){ if(toId===S.me.id) receiveCard(card); else if(S.bots[toId]) botReceiveCard(toId,card); return; }
-  const p = await ensurePeer(toId, S.isHost); p.send(JSON.stringify({ t:'card', card }));
+async function sendCardToThief(fromId, thiefId, card){
+  if(!S.useNet){ if(thiefId===S.me.id) thiefReceiveCard(card); return; }
+  const p=await ensurePeer(thiefId, S.isHost); p.send(JSON.stringify({t:'cardToThief', card}));
+}
+async function sendCardToTarget(thiefId, targetId, card){
+  if(!S.useNet){ if(targetId===S.me.id) targetReceiveCard(card, targetId); return; }
+  const p=await ensurePeer(targetId, S.isHost); p.send(JSON.stringify({t:'cardToTarget', card, target:targetId}));
 }
 
 /* ====== Kontroller ====== */
-$('#start-round').onclick = ()=>{
-  if(S.alive.size===0){ S.alive = new Set(Object.keys(S.presence)); }
-  const alive = Array.from(S.alive);
+$('#start-round').onclick=()=>{
+  if(S.alive.size===0) S.alive=new Set(Object.keys(S.presence));
+  const alive=Array.from(S.alive);
   if(alive.length<2) return alert('Kræver mindst 2 spillere. Slå NPC-fyld til eller brug 1p.');
-  if(alive.length===2) return publish({t:'final', seed:crypto.randomUUID(), first: alive[rnd(2)]});
-  const seed = crypto.randomUUID(); const order = alive.slice(); const startIdx = rnd(order.length);
-  publish({t:'startRound', seed, order, startIdx});
+  if(alive.length===2) return publish({t:'final',seed:crypto.randomUUID(),first:alive[rnd(2)]});
+  const seed=crypto.randomUUID(); const order=alive.slice(); const startIdx=rnd(order.length);
+  publish({t:'startRound',seed,order,startIdx});
 };
 $('#reveal').onclick = ()=> publish({t:'reveal'});
-$('#force-final').onclick = ()=>{
-  const alive = Array.from(S.alive);
+$('#force-final').onclick=()=>{
+  const alive=Array.from(S.alive);
   if(alive.length!==2) return alert('Finale kræver 2 spillere');
-  publish({t:'final', seed:crypto.randomUUID(), first: alive[rnd(2)]});
+  publish({t:'final',seed:crypto.randomUUID(),first:alive[rnd(2)]});
 };
-$('#show-hand').onclick = ()=>{
-  const label = S.localHand.map(c=> c==='death'?'DEATH':'Life').join(' , ');
+$('#show-hand').onclick=()=>{
+  const label = S.localHand.map((c,i)=> (c==='death'?'DEATH':'Life')).join(' , ');
   alert('Dine kort: ' + (label || '(ingen)'));
 };
+$('#confirm-swap').onclick = confirmGiveBack;
 
-/* ====== Rendering – viser KUN dine faktiske kort (2 eller 3) ====== */
+/* ====== Render ====== */
+function renderAll(){
+  renderPlayers();
+  renderTable();
+  $('#ui-phase').textContent=({lobby:'Lobby',round:'Runde',reveal:'Afsløring',final:'Finale',end:'Slut'})[S.phase]||S.phase;
+  $('#ui-turn').textContent=S.turnStage==='idle'?'—':(
+    S.turnStage==='chooseTarget'?'Vælg modstander':
+    S.turnStage==='chooseOppCard'?'Vælg modstanders kort':
+    S.turnStage==='chooseGiveBack'?'Vælg dit kort (byttes)':'—'
+  );
+  potBadge.textContent=String(S.pot); potBadgeSm.textContent=String(S.pot);
+  $('#confirm-swap').disabled = !(S.turnStage==='chooseGiveBack' && S.selectedIdx!==null);
+}
 function renderPlayers(){
   playersList.innerHTML='';
-  const ids = S.alive.size ? Array.from(S.alive) : Object.keys(S.presence);
+  const ids=S.alive.size? Array.from(S.alive):Object.keys(S.presence);
   ids.forEach(id=>{
     const li=document.createElement('li');
     const alive=S.alive.has(id);
@@ -380,115 +374,184 @@ function renderPlayers(){
                   <span class="text-xs ${alive?'text-emerald-400':'text-rose-400'}">${alive?'i spil':'ude'}</span>`;
     playersList.appendChild(li);
   });
-
+}
+function renderTable(){
+  const ids=S.alive.size? Array.from(S.alive):Object.keys(S.presence);
   table.innerHTML='';
-  const n = ids.length||4; const r=210;
+  const n=ids.length||4; const r=220;
   ids.forEach((id,i)=>{
     const angle=(i/n)*Math.PI*2 - Math.PI/2;
     const x=260+Math.cos(angle)*r, y=260+Math.sin(angle)*r;
     const seat=document.createElement('div'); seat.className='seat'; seat.style.left=x+'px'; seat.style.top=y+'px';
 
-    seat.innerHTML = `<div class="text-center mb-1 ${S.phase==='round' && S.seats[S.turnIdx]===id?'text-amber-300':''}">${S.presence[id]?.name||'?'}</div>`;
+    // Header
+    const isTurn = (S.phase==='round' && S.seats[S.turnIdx]===id);
+    seat.insertAdjacentHTML('afterbegin', `<div class="text-center mb-1 ${isTurn?'text-amber-300':''}">${S.presence[id]?.name||'?'}</div>`);
+
+    // Row of two cards (other players as backsides)
     const row=document.createElement('div'); row.className='flex items-center justify-center gap-2';
 
     if(id===S.me.id){
+      // show my real hand (2 or 3 during swap)
       S.localHand.forEach((card, idx)=>{
-        const c = document.createElement('div'); c.className='card';
-        if(card==='life')  c.classList.add('life');
-        if(card==='death') c.classList.add('death');
-
-        if(S.phase==='round' && S.seats[S.turnIdx]===id){
+        const c=document.createElement('div'); c.className='card';
+        if(card==='life') c.classList.add('life'); if(card==='death') c.classList.add('death');
+        if(S.phase==='round' && S.seats[S.turnIdx]===id && S.turnStage==='chooseGiveBack'){
+          // only allow selecting one of your *original* two (not the just-taken one)
+          const isForbidden = (S.pending.receivedIndex===idx);
           c.classList.add('me-turn');
           if(S.selectedIdx===idx) c.classList.add('selected');
-          c.onclick = ()=>{ S.selectedIdx = idx; $('#confirm-pass').disabled=false; renderPlayers(); };
+          c.onclick = ()=>{
+            if(isForbidden){ alert('Du skal give et af dine oprindelige kort tilbage – ikke det du lige tog.'); return; }
+            S.selectedIdx=idx; renderAll();
+          };
         }
         row.appendChild(c);
       });
     } else {
-      const p1=document.createElement('div'); p1.className='card';
-      const p2=document.createElement('div'); p2.className='card';
-      row.appendChild(p1); row.appendChild(p2);
+      // opponent seat: backsides, but clickable when selecting target or their card
+      // a wrapper for each backside to click L/R
+      for(let k=0;k<2;k++){
+        const c=document.createElement('div'); c.className='card';
+        // Selecting target?
+        if(S.phase==='round' && S.seats[S.turnIdx]===S.me.id){
+          if(S.turnStage==='chooseTarget'){
+            c.classList.add('me-turn','targetable');
+            c.title = `Vælg ${S.presence[id]?.name||'spiller'}`;
+            c.onclick = ()=> { if(id===S.me.id) return; S.pending.targetId=id; S.turnStage='chooseOppCard'; renderAll(); };
+          } else if(S.turnStage==='chooseOppCard' && S.pending.targetId===id){
+            c.classList.add('me-turn','selected');
+            c.title = k===0?'Tag venstre kort':'Tag højre kort';
+            c.onclick = ()=> chooseOppCardIndex(k);
+          }
+        }
+        row.appendChild(c);
+      }
     }
 
     seat.appendChild(row);
     table.appendChild(seat);
   });
-
-  potBadge.textContent=String(S.pot); potBadgeSm.textContent=String(S.pot);
-  $('#ui-phase').textContent = ({lobby:'Lobby',round:'Runde',reveal:'Afsløring',final:'Finale',end:'Slut'})[S.phase]||S.phase;
-
-  const canConfirm = (S.phase==='round' && S.seats[S.turnIdx]===S.me.id && S.selectedIdx!==null && S.localHand.length);
-  $('#confirm-pass').disabled = !canConfirm;
 }
 
 /* ====== Pot ====== */
-function recalcPot(){ const active = Array.from(S.alive).length; S.pot = active * (S.stake||0); renderPlayers(); }
+function recalcPot(){ const active=Array.from(S.alive).length; S.pot=active*(S.stake||0); renderAll(); }
 
-/* ====== Runde-flow m. pass-runder ====== */
+/* ====== Runde: start/deal ====== */
 function startRoundApply(seed, order, startIdx){
-  S.seats = order.slice(); S.startIdx=startIdx%S.seats.length; S.turnIdx=S.startIdx;
-  S.phase='round'; S.passLapCount=0; S.selectedIdx=null; renderPlayers(); log('🃏 Ny runde.');
+  S.seats=order.slice(); S.startIdx=startIdx%S.seats.length; S.turnIdx=S.startIdx;
+  S.phase='round'; S.passLapCount=0; S.turnStage='idle'; S.selectedIdx=null; S.pending={targetId:null,oppIdx:null,receivedIndex:null};
+  log('🃏 Ny runde – stjæl & byt.');
 
-  const total = S.seats.length*2;
-  const deck = Array(total).fill('life'); deck[rnd(total)]='death';
+  // Deal: total 2 per player, exactly 1 death overall
+  const total=S.seats.length*2;
+  const deck=Array(total).fill('life'); deck[rnd(total)]='death';
   S.hands={}; S.counts={}; S.localHand=[];
   S.seats.forEach(id=> S.counts[id]=0);
-
   for(let i=0;i<S.seats.length;i++){
     for(let c=0;c<2;c++){
-      const card = deck.splice(rnd(deck.length),1)[0];
-      const id = S.seats[i];
+      const card=deck.splice(rnd(deck.length),1)[0];
+      const id=S.seats[i];
       if(id===S.me.id) receiveCard(card);
       else if(S.bots[id]) botReceiveCard(id,card);
-      else sendSecret(id,card);
+      else sendCardToThief(/*from*/null, id, card); // initial deal to human via p2p (reuse path)
     }
   }
   publish({t:'enableTurn', id:S.seats[S.turnIdx]});
-  recalcPot();
+  recalcPot(); renderAll();
 }
 
-function receiveCard(card){ S.localHand.push(card); S.hands[S.me.id]=S.localHand; S.counts[S.me.id]=(S.counts[S.me.id]||0)+1; renderPlayers(); }
+/* ====== Card IO ====== */
+function receiveCard(card){ S.localHand.push(card); S.hands[S.me.id]=S.localHand; S.counts[S.me.id]=(S.counts[S.me.id]||0)+1; renderAll(); }
 function botReceiveCard(id, card){ S.hands[id]=(S.hands[id]||[]); S.hands[id].push(card); S.counts[id]=(S.counts[id]||0)+1; }
 
-/* Bekræft valgt kort */
-$('#confirm-pass').onclick = ()=> {
-  if(!(S.phase==='round' && S.seats[S.turnIdx]===S.me.id)) return;
-  if(S.selectedIdx===null || !S.localHand.length) return;
-
-  const idx = Math.max(0, Math.min(S.selectedIdx, S.localHand.length-1));
-  const card = S.localHand.splice(idx,1)[0];
-  S.counts[S.me.id] = Math.max(0, (S.counts[S.me.id]||0)-1);
-  S.selectedIdx = null;
-
-  const toIdx = (S.turnIdx+1)%S.seats.length; const to=S.seats[toIdx];
-  if(S.bots[to]) botReceiveCard(to,card); else if(to===S.me.id) receiveCard(card); else sendSecret(to,card);
-  publish({t:'turn', from:S.seats[S.turnIdx], to});
-  renderPlayers();
-};
-
-function enableTurn(){
-  if(S.seats[S.turnIdx]!==S.me.id) return;
-  S.selectedIdx=null;
-  log('✨ Din tur: klik et kort og tryk "Bekræft".');
-  renderPlayers();
+function thiefReceiveCard(card){
+  // I (thief) received opponent's card: append as new last index, remember index to forbid giving it back
+  const newIdx = S.localHand.length;
+  S.localHand.push(card);
+  S.pending.receivedIndex = newIdx;
+  S.turnStage='chooseGiveBack';
+  log(`Du modtog modstanderens kort. Vælg nu ét af dine oprindelige kort at give tilbage.`);
+  renderAll();
+}
+function targetReceiveCard(card, targetId){
+  // I (target) received thief's give-back
+  if(targetId!==S.me.id) return; // ignore if routed elsewhere
+  S.localHand.push(card);
+  renderAll();
 }
 
-function applyTurn(from,to){
+/* ====== Turn flow – my turn ====== */
+function beginMyTurn(){
+  if(S.phase!=='round') return;
+  S.turnStage='chooseTarget'; S.pending={targetId:null,oppIdx:null,receivedIndex:null}; S.selectedIdx=null;
+  log('✨ Din tur: vælg en modstander.');
+  renderAll();
+}
+function chooseOppCardIndex(idx){
+  if(!(S.turnStage==='chooseOppCard' && S.pending.targetId)) return;
+  S.pending.oppIdx = idx;
+  // Ask target to send their card (secret) to me
+  publish({t:'askOppCard', thief:S.me.id, target:S.pending.targetId, idx});
+  log(`Du vælger ${S.presence[S.pending.targetId]?.name||'?'}s ${idx===0?'venstre':'højre'} kort...`);
+}
+function confirmGiveBack(){
+  if(!(S.turnStage==='chooseGiveBack' && S.selectedIdx!==null)) return;
+  if(S.selectedIdx===S.pending.receivedIndex){ alert('Du må ikke give det kort tilbage, du lige tog.'); return; }
+  const give = S.localHand[S.selectedIdx];
+  // Remove selected give-back from my hand:
+  S.localHand.splice(S.selectedIdx,1);
+  if(S.pending.receivedIndex > S.selectedIdx) S.pending.receivedIndex--; // shift index if needed
+  // Send to target:
+  sendCardToTarget(S.me.id, S.pending.targetId, give);
+  log(`Du gav et kort tilbage til ${S.presence[S.pending.targetId]?.name||'modstander'}.`);
+  // Turn done
+  S.turnStage='idle'; S.selectedIdx=null; S.pending={targetId:null,oppIdx:null,receivedIndex:null};
+  publish({t:'turnDone'});
+  renderAll();
+}
+
+/* ====== Turn flow – events anyone listens to ====== */
+// Target must send its chosen card secretly to thief and remove it from own hand
+function onAskOppCard(thiefId, targetId, idx){
+  if(S.bots[targetId]){
+    // bot target: take idx from bot hand
+    const h=S.hands[targetId]||[];
+    const card=h.splice(idx,1)[0];
+    sendCardToThief(targetId, thiefId, card);
+    publish({t:'gotOppCard', thief:thiefId});
+    return;
+  }
+  if(targetId!==S.me.id) return;
+  const h=S.localHand;
+  if(!h.length) return;
+  const card = h.splice(Math.max(0,Math.min(idx,h.length-1)),1)[0];
+  sendCardToThief(S.me.id, thiefId, card);
+  log(`🔻 ${S.presence[thiefId]?.name||'Spiller'} tog ét af dine kort.`);
+  renderAll();
+  publish({t:'gotOppCard', thief:thiefId});
+}
+function onGotOppCard(thiefId){
+  if(thiefId===S.me.id){
+    // my UI will be updated by thiefReceiveCard via p2p already
+  }
+}
+
+/* ====== Advance to next turn & laps ====== */
+function applyTurnAdvance(){
+  // next seat turn
+  const prev=S.turnIdx;
   S.turnIdx=(S.turnIdx+1)%S.seats.length;
 
-  const lapEnded = (to===S.seats[S.startIdx]) && (S.turnIdx===S.startIdx);
+  // lap end?
+  const lapEnded = (S.turnIdx===S.startIdx);
   if(lapEnded){
     S.passLapCount++;
-    log(`🔁 Pass-runde ${S.passLapCount}/${S.passTarget} gennemført.`);
-    if(S.passLapCount >= S.passTarget){
-      S.phase='reveal'; renderPlayers(); log('🔔 Aftalt antal pass-runder nået – klar til afsløring.');
-      return;
-    }
-    publish({t:'enableTurn', id:S.seats[S.turnIdx]});
-  } else {
-    publish({t:'enableTurn', id:S.seats[S.turnIdx]});
+    log(`🔁 Omgang ${S.passLapCount}/${S.passTarget} fuldført.`);
+    if(S.passLapCount>=S.passTarget){ S.phase='reveal'; renderAll(); log('🔔 Omgange nået – klar til afsløring.'); return; }
   }
-  renderPlayers();
+  publish({t:'enableTurn', id:S.seats[S.turnIdx]});
+  renderAll();
   maybeBotTakeTurn(S.seats[S.turnIdx]);
 }
 
@@ -502,62 +565,60 @@ function eliminate(id){
   if(!S.alive.has(id)) return;
   S.alive.delete(id);
   log(`☠️ ${S.presence[id]?.name||id} er ude (Death).`);
-  const alive = Array.from(S.alive);
+  const alive=Array.from(S.alive);
   if(alive.length===1) publish({t:'end', winner:alive[0]});
-  else if(alive.length===2) publish({t:'final', seed:crypto.randomUUID(), first: alive[rnd(2)]});
-  else { S.phase='lobby'; renderPlayers(); log('Værten kan starte næste runde.'); }
-  recalcPot();
+  else if(alive.length===2) publish({t:'final', seed:crypto.randomUUID(), first:alive[rnd(2)]});
+  else { S.phase='lobby'; log('Værten kan starte næste runde.'); }
+  recalcPot(); renderAll();
 }
 
-/* ====== Finale ====== */
+/* ====== Finale (samme som før) ====== */
 let F={deck:[], face:[], turn:null};
 function startFinal(seed, first){
-  S.phase='final'; renderPlayers(); log('🏁 Finale! 8 kort i cirkel.');
-  F.deck = Array(8).fill('life'); F.deck[rnd(8)]='death'; F.face=Array(8).fill(false); F.turn=first;
+  S.phase='final'; renderAll(); log('🏁 Finale! 8 kort i cirkel.');
+  F.deck=Array(8).fill('life'); F.deck[rnd(8)]='death'; F.face=Array(8).fill(false); F.turn=first;
   if(F.turn===S.me.id) finalPickPrompt(); else if(S.bots[F.turn]) botFinalPick(F.turn);
 }
-function finalPickPrompt(){
-  const s=prompt('Finale: vælg felt 1–8'); const idx=Math.max(1,Math.min(8,parseInt(s||'1',10)))-1;
-  const card = F.deck[idx]; publish({t:'finalPick', id:S.me.id, idx, card});
-}
+function finalPickPrompt(){ const s=prompt('Finale: vælg felt 1–8'); const idx=Math.max(1,Math.min(8,parseInt(s||'1',10)))-1; const card=F.deck[idx]; publish({t:'finalPick', id:S.me.id, idx, card}); }
 function finalApplyPick(id, idx, card){
   if(F.face[idx]) return; F.face[idx]=true;
   log(`🎲 ${S.presence[id]?.name||id} trak ${card==='death'?'DEATH':'Life'}.`);
-  if(card==='death'){
-    const loser=id; const alive=Array.from(S.alive); const winner=alive.find(x=>x!==loser) || S.me.id;
-    publish({t:'end', winner}); return;
-  }
+  if(card==='death'){ const loser=id; const alive=Array.from(S.alive); const winner=alive.find(x=>x!==loser)||S.me.id; publish({t:'end',winner}); return; }
   const alive=Array.from(S.alive); const other=alive.find(x=>x!==id);
   F.turn=other; if(other===S.me.id) finalPickPrompt(); else if(S.bots[other]) botFinalPick(other);
 }
-function endGame(winner){
-  S.phase='end'; renderPlayers();
-  const name=S.presence[winner]?.name||'Ukendt';
-  log(`🏆 ${name} vinder og tager ${S.pot} guld!`); alert(`${name} vinder ${S.pot} guld!`);
-}
+function endGame(winner){ S.phase='end'; renderAll(); const name=S.presence[winner]?.name||'Ukendt'; log(`🏆 ${name} vinder og tager ${S.pot} guld!`); alert(`${name} vinder ${S.pot} guld!`); }
 
 /* ====== Bots ====== */
 function maybeBotTakeTurn(id){
   if(S.phase!=='round' || !S.bots[id]) return;
+  // Bot plays: choose random live target != id, choose index, then choose give-back (prefer to dump death)
   setTimeout(()=>{
-    const hand=S.hands[id]||[];
-    let pick = (hand.length<2)?0 : (Math.random()<0.6? (hand[0]==='death'?0:1) : (Math.random()<0.5?0:1));
-    const card = hand.splice(pick,1)[0];
-    const toIdx=(S.turnIdx+1)%S.seats.length; const to=S.seats[toIdx];
-    if(S.bots[to]) botReceiveCard(to,card); else if(to===S.me.id) receiveCard(card); else sendSecret(to,card);
-    publish({t:'turn', from:id, to});
-  }, 500 + rnd(700));
-}
-function botFinalPick(id){
-  setTimeout(()=>{
-    const choices=[]; for(let i=0;i<8;i++) if(!F.face[i]) choices.push(i);
-    const idx = choices[Math.floor(Math.random()*choices.length)];
-    const card = F.deck[idx]; publish({t:'finalPick', id, idx, card});
-  }, 700 + rnd(800));
+    const lives=Array.from(S.alive).filter(x=>x!==id);
+    const target = lives[rnd(lives.length)];
+    const idx = rnd(2);
+    // take target idx
+    const thand = S.hands[target]||[];
+    const taken = thand.splice(idx,1)[0] || (Math.random()<0.125?'death':'life'); // fallback
+    // give back from its originals (prefer give death if it has)
+    const my = S.hands[id]||[];
+    // bot keeps the taken card; must give one original back
+    const originalChoices=my; // my contains only originals at this point
+    let giveIdx = originalChoices.findIndex(c=>c==='death');
+    if(giveIdx<0) giveIdx = 0;
+    const give = originalChoices.splice(giveIdx,1)[0] || 'life';
+    // now bot hand becomes: originals minus one + taken card
+    my.push(taken);
+    S.hands[id]=my;
+    // target receives give
+    const tgt = S.hands[target]||[]; tgt.push(give); S.hands[target]=tgt;
+    log(`🤖 ${S.presence[id]?.name||'NPC'} byttede med ${S.presence[target]?.name||'spiller'}.`);
+    publish({t:'turnDone'});
+  }, 600+rnd(900));
 }
 
 /* ====== Misc ====== */
-function setupNames(){ S.me.name = $('#my-name').value || 'DM'; }
+function setupNames(){ S.me.name=$('#my-name').value||'DM'; }
 </script>
 </body>
 </html>
